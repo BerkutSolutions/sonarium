@@ -1,0 +1,17 @@
+SCC/
+.git
+.gitignore
+.gocache
+.idea
+.vscode
+.env
+.env.local
+*.exe
+bin
+dist
+build
+tmp
+temp
+logs
+*.log
+docs/assets/screenshots

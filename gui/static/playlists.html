@@ -1,0 +1,56 @@
+﻿<link rel="stylesheet" href="/static/styles.css" />
+<section class="sh-section sh-page-shell sh-media-page">
+  <form id="create-playlist-form" class="sh-inline-form">
+    <input id="playlist-name" type="text" data-i18n-placeholder="playlist_new_name" placeholder="New playlist name" required />
+    <button type="submit" data-i18n="create">Create</button>
+  </form>
+  <div id="playlists-list" class="sh-list"></div>
+</section>
+
+<div id="playlist-modal" class="sh-modal-backdrop" hidden>
+  <div class="sh-modal sh-media-modal">
+    <header class="sh-modal-header">
+      <h3 id="playlist-modal-heading" data-i18n="playlist_contents">Playlist</h3>
+      <button type="button" id="playlist-modal-close" class="sh-modal-close" aria-label="Close">×</button>
+    </header>
+    <div class="sh-modal-body">
+      <div class="sh-media-cover-wrap">
+        <img id="playlist-modal-cover" src="/static/logo.png" alt="cover" class="sh-modal-cover" />
+        <label class="sh-cover-upload-btn">
+          <span data-i18n="upload">Upload</span>
+          <input id="playlist-cover-input" type="file" accept="image/*" hidden />
+        </label>
+      </div>
+
+      <div class="sh-media-content">
+        <div class="sh-media-eyebrow" data-i18n="playlist_contents">Playlist</div>
+        <div class="sh-media-title-row">
+          <h1 id="playlist-modal-title-view" class="sh-media-title"></h1>
+          <button id="playlist-name-edit-btn" type="button" class="sh-icon-btn sh-media-edit-btn" aria-label="Edit" data-i18n-aria-label="edit">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16.5V20h3.5L18 9.5 14.5 6zM19.7 7.8a1 1 0 0 0 0-1.4l-2.1-2.1a1 1 0 0 0-1.4 0L14.8 5.7l3.5 3.5z"/></svg>
+          </button>
+        </div>
+        <input id="playlist-modal-name" type="text" class="sh-media-title-input" hidden />
+
+        <div id="playlist-modal-id-row" class="sh-modal-info-line" hidden>
+          <span>ID</span>
+          <strong id="playlist-modal-id">-</strong>
+        </div>
+
+        <div class="sh-media-actions">
+          <button type="button" id="playlist-modal-play" data-i18n="play">Play</button>
+          <button type="button" id="playlist-modal-queue" data-i18n="add_to_queue">Add to queue</button>
+          <button type="button" id="playlist-modal-edit" data-i18n="edit">Edit</button>
+          <button type="button" id="playlist-modal-save" data-i18n="save">Save</button>
+          <button type="button" id="playlist-modal-delete" data-i18n="delete">Delete</button>
+        </div>
+
+        <div class="sh-media-search">
+          <input id="playlist-modal-track-search" type="text" data-i18n-placeholder="search_placeholder" placeholder="Search tracks" />
+        </div>
+        <div id="playlist-modal-search-results" class="sh-list"></div>
+        <div id="playlist-modal-tracks" class="sh-list sh-ya-track-list"></div>
+      </div>
+    </div>
+  </div>
+</div>

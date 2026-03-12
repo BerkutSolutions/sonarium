@@ -1,0 +1,63 @@
+﻿<link rel="stylesheet" href="/static/styles.css" />
+<section class="sh-section sh-page-shell sh-media-page">
+  <div id="artists-list" class="sh-grid"></div>
+</section>
+
+<div id="artist-edit-modal" class="sh-modal-backdrop" hidden>
+  <div class="sh-modal sh-artist-edit-modal">
+    <header class="sh-modal-header">
+      <h3 data-i18n="edit_artist">Edit artist</h3>
+      <button type="button" id="artist-edit-close" class="sh-modal-close" aria-label="Close">×</button>
+    </header>
+    <div class="sh-modal-body">
+      <form id="artist-edit-form" class="sh-detail-edit-form">
+        <label class="sh-detail-edit-field">
+          <span data-i18n="artist">Artist</span>
+          <input type="text" id="artist-edit-name" required />
+        </label>
+        <label class="sh-detail-edit-field">
+          <span data-i18n="artist_merge_target">Merge into existing artist</span>
+          <select id="artist-edit-merge-target">
+            <option value="" data-i18n="artist_merge_none">Do not merge</option>
+          </select>
+        </label>
+        <p class="sh-library-panel-copy" data-i18n="artist_merge_hint">If you select an existing artist, tracks and albums will be merged into it.</p>
+        <div class="sh-detail-edit-actions">
+          <button type="button" class="btn ghost" id="artist-edit-cancel" data-i18n="cancel">Cancel</button>
+          <button type="submit" class="btn primary" data-i18n="save">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="artist-modal" class="sh-modal-backdrop" hidden>
+  <div class="sh-modal sh-media-modal sh-artist-modal">
+    <header class="sh-modal-header">
+      <h3 data-i18n="artist_info">Artist</h3>
+      <button type="button" id="artist-modal-close" class="sh-modal-close" aria-label="Close">×</button>
+    </header>
+    <div class="sh-modal-body">
+      <div class="sh-media-cover-wrap">
+        <img id="artist-modal-cover" src="/static/logo.png" alt="cover" class="sh-modal-cover" />
+      </div>
+      <div class="sh-media-content">
+        <div class="sh-media-eyebrow" data-i18n="artist">Artist</div>
+        <div class="sh-media-title-row">
+          <h1 id="artist-modal-name-view" class="sh-media-title"></h1>
+          <button id="artist-modal-edit" type="button" class="sh-icon-btn sh-media-edit-btn" aria-label="Edit" data-i18n-aria-label="edit">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16.5V20h3.5L18 9.5 14.5 6zM19.7 7.8a1 1 0 0 0 0-1.4l-2.1-2.1a1 1 0 0 0-1.4 0L14.8 5.7l3.5 3.5z"/></svg>
+          </button>
+        </div>
+        <input id="artist-modal-name" type="text" class="sh-media-title-input" hidden />
+        <div id="artist-modal-id-row" class="sh-modal-info-line" hidden><span>ID</span><strong id="artist-modal-id">-</strong></div>
+        <h4 data-i18n="albums">Albums</h4>
+        <div id="artist-modal-albums" class="sh-artist-albums-grid"></div>
+      </div>
+    </div>
+    <footer class="sh-modal-footer">
+      <button type="button" id="artist-modal-save" data-i18n="save">Save</button>
+      <button type="button" id="artist-modal-delete" data-i18n="delete">Delete</button>
+    </footer>
+  </div>
+</div>

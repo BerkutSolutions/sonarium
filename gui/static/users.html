@@ -1,0 +1,38 @@
+<link rel="stylesheet" href="/static/styles.css" />
+<section class="sh-section sh-library-page">
+  <div class="sh-library-hero">
+    <div>
+      <p class="sh-library-hero-copy" data-i18n="users_policy_hint">User management and registration policy</p>
+    </div>
+  </div>
+
+  <div class="sh-library-grid">
+    <section class="sh-library-panel">
+      <div class="sh-library-panel-head">
+        <div>
+          <h3 data-i18n="registration">Registration</h3>
+          <p class="sh-library-panel-copy" data-i18n="users_allow_registration_hint">Disable this to block the Register flow for new users.</p>
+        </div>
+      </div>
+
+      <div class="sh-library-stat">
+        <label class="checkbox sh-users-registration-toggle">
+          <input type="checkbox" id="users-registration-open" />
+          <span data-i18n="users_allow_registration">Allow new registrations</span>
+        </label>
+      </div>
+    </section>
+
+    <section class="sh-library-panel">
+      <div class="sh-library-panel-head">
+        <div>
+          <h3 data-i18n="users">Users</h3>
+          <p class="sh-library-panel-copy" data-i18n="users_policy_hint">User management and registration policy</p>
+        </div>
+      </div>
+
+      <p id="users-error" class="alert" hidden></p>
+      <div id="users-list" class="sh-settings-list sh-users-list"></div>
+    </section>
+  </div>
+</section>

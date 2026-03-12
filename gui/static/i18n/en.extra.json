@@ -1,0 +1,19 @@
+{
+  "share": "Share",
+  "public_link": "Public link",
+  "share_enable_public": "Enable link access",
+  "copy_link": "Copy link",
+  "copied": "Copied",
+  "share_with_user": "Share with user",
+  "shared_access": "Current access",
+  "share_empty": "No direct shares yet.",
+  "remove_access": "Remove access",
+  "listener": "Listener",
+  "editor": "Editor",
+  "viewer": "Viewer",
+  "select_user": "Select user",
+  "profile_public": "Show profile to other users",
+  "shared_with_me": "Shared with me",
+  "shared_with_me_hint": "Entities that other users shared with you.",
+  "shared_with_me_empty": "Nothing has been shared with you yet."
+}

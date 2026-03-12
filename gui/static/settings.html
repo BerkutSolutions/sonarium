@@ -1,0 +1,31 @@
+<link rel="stylesheet" href="/static/styles.css" />
+<section class="sh-section sh-library-page">
+  <div class="sh-library-hero">
+    <div>
+      <p class="sh-library-hero-copy" data-i18n="settings_manage_hint">View the current server configuration and library environment.</p>
+    </div>
+  </div>
+
+  <div class="sh-library-grid sh-library-grid-single">
+    <section class="sh-library-panel">
+      <div class="sh-library-panel-head">
+        <div>
+          <h3 data-i18n="server_info">Server Info</h3>
+          <p class="sh-library-panel-copy" data-i18n="server_info">Server Info</p>
+        </div>
+      </div>
+      <div id="settings-content" class="sh-settings-list"></div>
+    </section>
+    <section class="sh-library-panel" id="settings-updates-panel" hidden>
+      <div class="sh-library-panel-head">
+        <div>
+          <h3 data-i18n="updates">Updates</h3>
+          <p class="sh-library-panel-copy" data-i18n="updates_manage_hint">Check the latest release on GitHub.</p>
+        </div>
+        <button type="button" class="btn ghost" id="settings-check-updates-btn" data-i18n="check_updates">Check updates</button>
+      </div>
+      <div id="settings-updates-content" class="sh-settings-list"></div>
+      <p id="settings-updates-error" class="alert" hidden></p>
+    </section>
+  </div>
+</section>

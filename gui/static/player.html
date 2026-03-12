@@ -1,0 +1,61 @@
+<div class="sh-player">
+  <div class="sh-player-surface">
+    <div class="sh-player-progress-frame">
+      <input id="player-progress" type="range" min="0" max="10000" value="0" />
+    </div>
+    <div class="sh-player-main">
+      <div class="sh-player-meta">
+        <img id="player-cover" src="/static/logo.png" alt="cover" class="sh-player-cover" />
+        <div>
+          <div id="player-title" class="sh-player-title" data-i18n="player_no_track">No track selected</div>
+          <div id="player-artist" class="sh-player-artist">-</div>
+        </div>
+      </div>
+      <div class="sh-player-controls">
+        <button id="player-prev" type="button" class="sh-icon-btn" aria-label="Previous" data-i18n-aria-label="player_prev">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 6h2v12H7zm3 6 9 6V6z"/></svg>
+        </button>
+        <button id="player-toggle" type="button" class="sh-icon-btn sh-icon-btn-primary" aria-label="Play" data-i18n-aria-label="player_play">
+          <svg class="sh-icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+          <svg class="sh-icon-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zm6 0h4v14h-4z"/></svg>
+        </button>
+        <button id="player-next" type="button" class="sh-icon-btn" aria-label="Next" data-i18n-aria-label="player_next">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6h2v12h-2zM5 6v12l9-6z"/></svg>
+        </button>
+        <button id="player-shuffle" type="button" class="sh-icon-btn" aria-label="Shuffle" data-i18n-aria-label="player_shuffle">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5h-2V6.41l-3.29 3.3-1.42-1.42 3.3-3.29H16zm3 14.59V16h2v5h-5v-2h1.59l-3.3-3.29 1.42-1.42zM3 7h3.59l9 9H21v2h-6.41l-9-9H3zm0 10v-2h2.59l2.7-2.71 1.42 1.42L6.41 17z"/></svg>
+        </button>
+        <button id="player-repeat" type="button" class="sh-icon-btn" data-mode="off" aria-label="Repeat" data-i18n-aria-label="player_repeat">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10V4l4 4-4 4V9H7a3 3 0 0 0-3 3v1H2v-1a5 5 0 0 1 5-5zm10 10H7v3l-4-4 4-4v3h10a3 3 0 0 0 3-3v-1h2v1a5 5 0 0 1-5 5z"/></svg>
+        </button>
+        <button id="player-queue-toggle" type="button" class="sh-icon-btn" aria-label="Queue" data-i18n-aria-label="player_queue">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v2H3zm0 5h12v2H3zm0 5h18v2H3z"/></svg>
+        </button>
+      </div>
+      <canvas id="player-waveform" class="sh-player-waveform" width="1200" height="64"></canvas>
+      <div class="sh-player-volume">
+        <button id="player-volume-toggle" type="button" class="sh-icon-btn" aria-label="Volume" data-i18n-aria-label="player_volume">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4h4l5 4V6L7 10zm13.5 2a4.5 4.5 0 0 0-2.5-4.03v8.06A4.5 4.5 0 0 0 16.5 12zm0-8v2a8 8 0 0 1 0 12v2a10 10 0 0 0 0-16z"/></svg>
+        </button>
+        <div class="sh-volume-popover">
+          <input id="player-volume" type="range" min="0" max="1" step="0.01" value="1" />
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="sh-player-progress-overlay">
+    <span id="player-time-current" class="sh-time sh-time-chip">0:00</span>
+    <span id="player-time-duration" class="sh-time sh-time-chip">0:00</span>
+    <span id="player-progress-dot" aria-hidden="true"></span>
+  </div>
+
+  <aside id="player-queue-panel" class="sh-player-queue-panel">
+    <div class="sh-player-queue-head">
+      <strong data-i18n="player_queue">Queue</strong>
+      <button id="player-queue-clear" type="button" data-i18n="player_clear">Clear</button>
+    </div>
+    <ol id="player-queue-list" class="sh-queue-list"></ol>
+  </aside>
+
+  <audio id="audio-player" preload="metadata"></audio>
+</div>

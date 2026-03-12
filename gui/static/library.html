@@ -1,0 +1,63 @@
+<link rel="stylesheet" href="/static/styles.css" />
+<section class="sh-section sh-library-page">
+  <div class="sh-library-hero">
+    <div>
+      <p class="sh-library-hero-copy" data-i18n="library_manage_hint">Manage scanning and upload new music into your collection.</p>
+    </div>
+    <div class="sh-library-hero-badge">
+      <span data-i18n="scanner">Scanner</span>
+      <strong id="library-scan-status-hero">Idle</strong>
+    </div>
+  </div>
+
+  <div class="sh-library-grid">
+    <section class="sh-library-panel sh-library-panel-scan">
+      <div class="sh-library-panel-head">
+        <div>
+          <h3 data-i18n="scanner">Scanner</h3>
+          <p class="sh-library-panel-copy" data-i18n="scanner_status">Scanner Status</p>
+        </div>
+        <span id="library-scan-status-badge" class="sh-library-status-badge">Idle</span>
+      </div>
+
+      <div class="sh-library-stats">
+        <div class="sh-library-stat">
+          <span data-i18n="library_path">Library Path</span>
+          <strong id="library-path-value">-</strong>
+        </div>
+        <div class="sh-library-stat">
+          <span data-i18n="status">Status</span>
+          <strong id="library-scan-status">Idle</strong>
+        </div>
+      </div>
+
+      <div class="sh-library-panel-actions">
+        <button type="button" id="scan-library-btn" data-i18n="scan_library">Scan Library</button>
+      </div>
+    </section>
+
+    <section class="sh-library-panel sh-library-panel-upload">
+      <div class="sh-library-panel-head">
+        <div>
+          <h3 data-i18n="upload_music">Upload Music</h3>
+          <p class="sh-library-panel-copy" data-i18n="upload_auto_hint">Files are uploaded automatically after selection.</p>
+        </div>
+      </div>
+
+      <form id="library-upload-form" class="sh-library-upload-form" enctype="multipart/form-data">
+        <input id="library-upload-file" class="sh-library-upload-input" type="file" accept=".mp3,.flac,.ogg,.m4a,audio/*" multiple />
+        <input id="library-upload-folder" class="sh-library-upload-input" type="file" webkitdirectory directory multiple />
+        <label for="library-upload-file" class="sh-library-upload-trigger" data-i18n="upload">Upload</label>
+        <label for="library-upload-folder" class="sh-library-upload-trigger secondary" data-i18n="upload_folder">Upload folder</label>
+        <span id="library-upload-selected" class="sh-library-upload-selected" data-i18n="library_no_files_selected">No files selected</span>
+      </form>
+
+      <div id="library-upload-dropzone" class="sh-library-dropzone">
+        <strong data-i18n="drag_drop_files">Drag and drop files here</strong>
+        <span data-i18n="upload_auto_hint">Files are uploaded automatically after selection.</span>
+      </div>
+
+      <p id="library-upload-result" class="sh-library-upload-result"></p>
+    </section>
+  </div>
+</section>

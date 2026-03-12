@@ -1,0 +1,41 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+*.out
+bin/
+dist/
+build/
+
+# Go
+.gocache/
+coverage.out
+*.test
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db
+.DS_Store
+
+# Runtime / data
+tmp/
+temp/
+logs/
+*.log
+
+# Optional local screenshots or exports
+docs/assets/screenshots/*.png
+docs/assets/screenshots/*.jpg
+docs/assets/screenshots/*.jpeg
+docs/assets/screenshots/*.webp
+docs/assets/screenshots/*.gif
+!docs/assets/screenshots/.gitkeep

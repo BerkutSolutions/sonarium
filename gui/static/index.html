@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sonarium</title>
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon16.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon32.png" />
+  <link rel="icon" type="image/png" sizes="64x64" href="/static/favicon64.png" />
+  <link rel="shortcut icon" href="/static/favicon.ico" />
+  <link rel="apple-touch-icon" href="/static/logo.png" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body class="auth-locked">
+  <div class="sh-app">
+    <aside class="sh-sidebar">
+      <div class="sh-brand">
+        <img src="/static/logo.png" alt="Sonarium" class="sh-logo" />
+        <span class="sh-brand-text"><span class="sh-brand-top">Berkut Solutions</span><span class="sh-brand-bottom">Sonarium</span></span>
+      </div>
+      <nav class="sh-nav" id="sidebar-nav">
+        <a href="/" data-route="/" data-i18n="home">Home</a>
+        <a href="/albums" data-route="/albums" data-i18n="albums">Albums</a>
+        <a href="/playlists" data-route="/playlists" data-i18n="playlists">Playlists</a>
+        <a href="/tracks" data-route="/tracks" data-i18n="tracks">Tracks</a>
+        <a href="/genres" data-route="/genres" data-i18n="genres">Genres</a>
+        <a href="/artists" data-route="/artists" data-i18n="artists">Artists</a>
+        <a href="/search" data-route="/search" data-i18n="search">Search</a>
+        <a href="/library" data-route="/library" data-i18n="library">Library</a>
+        <a href="/settings" data-route="/settings" data-i18n="settings">Settings</a>
+        <a href="/users" data-route="/users" id="nav-users" data-i18n="users" hidden>Users</a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-tools">
+          <select id="lang-select" class="sidebar-lang-select" aria-label="Language" data-i18n-aria-label="language">
+            <option value="en">English</option>
+            <option value="ru">Russian</option>
+          </select>
+          <button type="button" class="icon-btn" id="profile-btn" aria-label="Profile" data-i18n-aria-label="profile">
+            <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16">
+              <path fill="currentColor" d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5Z"/>
+            </svg>
+          </button>
+          <button type="button" class="icon-btn" id="logout-btn" aria-label="Logout" data-i18n-aria-label="logout">
+            <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16">
+              <path fill="currentColor" d="M5 3h8a2 2 0 0 1 2 2v3h-2V5H5v14h8v-3h2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm11.3 5.3L20 12l-3.7 3.7-1.4-1.4 1.3-1.3H9v-2h7.2l-1.3-1.3 1.4-1.4Z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="sh-content">
+      <header class="sh-header">
+        <h1 id="page-title">Music Library</h1>
+      </header>
+      <section id="page-content" class="sh-page-content">
+        <p data-i18n="loading">Loading...</p>
+      </section>
+    </main>
+  </div>
+
+  <footer id="player-root" class="sh-player-root"></footer>
+
+  <div id="auth-overlay">
+    <div class="auth-card" id="auth-login-view">
+      <div class="sh-auth-brand">
+        <img src="/static/logo.png" alt="Sonarium" class="sh-auth-logo" />
+        <span class="sh-brand-text"><span class="sh-brand-top">Berkut Solutions</span><span class="sh-brand-bottom">Sonarium</span></span>
+      </div>
+      <p class="sh-auth-copy" data-i18n="auth_login_subtitle">Sign in to continue to SoundHub.</p>
+      <form id="auth-login-form" class="sh-detail-edit-form sh-auth-form">
+        <label class="sh-detail-edit-field"><span data-i18n="username">Username</span><input type="text" name="username" required /></label>
+        <label class="sh-detail-edit-field"><span data-i18n="password">Password</span><input type="password" name="password" required /></label>
+        <div id="auth-login-error" class="alert" hidden></div>
+        <div class="sh-detail-edit-actions sh-auth-actions">
+          <button type="submit" class="btn primary" data-i18n="login">Login</button>
+          <button type="button" class="btn ghost" id="auth-open-register" data-i18n="registration">Registration</button>
+        </div>
+      </form>
+    </div>
+    <div class="auth-card" id="auth-setup-view" hidden>
+      <div class="sh-auth-brand">
+        <img src="/static/logo.png" alt="Sonarium" class="sh-auth-logo" />
+        <span class="sh-brand-text"><span class="sh-brand-top">Berkut Solutions</span><span class="sh-brand-bottom">Sonarium</span></span>
+      </div>
+      <h2 data-i18n="auth_register_title">Welcome to SoundHub</h2>
+      <p data-i18n="auth_register_subtitle">Create the first account. The first created user becomes admin.</p>
+      <form id="auth-register-form" class="sh-detail-edit-form sh-auth-form">
+        <label class="sh-detail-edit-field"><span data-i18n="nickname">Nickname</span><input type="text" name="display_name" required /></label>
+        <label class="sh-detail-edit-field"><span data-i18n="username">Username</span><input type="text" name="username" required /></label>
+        <label class="sh-detail-edit-field"><span data-i18n="new_password">Password</span><input type="password" name="password" required /></label>
+        <label class="sh-detail-edit-field"><span data-i18n="repeat_password">Repeat password</span><input type="password" name="password_repeat" required /></label>
+        <div id="auth-register-error" class="alert" hidden></div>
+        <div class="sh-detail-edit-actions sh-auth-actions">
+          <button type="submit" class="btn primary" data-i18n="auth_create_account">Create account</button>
+          <button type="button" class="btn ghost" id="auth-back-login" data-i18n="auth_back">Back</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="share-modal" class="sh-modal-backdrop" hidden>
+    <div class="sh-modal sh-share-modal">
+      <header class="sh-modal-header">
+        <h3 data-i18n="share">Share</h3>
+        <button type="button" id="share-modal-close" class="sh-modal-close" aria-label="Close">×</button>
+      </header>
+      <div class="sh-modal-body">
+        <div class="sh-detail-edit-form sh-share-form">
+          <section class="sh-share-section">
+            <h4 data-i18n="public_link">Public link</h4>
+            <label class="sh-settings-toggle">
+              <input type="checkbox" id="share-public-toggle" />
+              <span data-i18n="share_enable_public">Enable link access</span>
+            </label>
+            <div class="sh-share-link-row">
+              <input type="text" id="share-public-link" readonly />
+              <button type="button" class="btn ghost" id="share-copy-link" data-i18n="copy_link">Copy link</button>
+            </div>
+          </section>
+          <section class="sh-share-section">
+            <h4 data-i18n="share_with_user">Share with user</h4>
+            <div class="sh-share-user-row">
+              <select id="share-user-select"></select>
+              <select id="share-permission-select">
+                <option value="listener">Listener</option>
+                <option value="editor">Editor</option>
+              </select>
+              <button type="button" class="btn primary" id="share-user-add" data-i18n="share">Share</button>
+            </div>
+          </section>
+          <section class="sh-share-section">
+            <h4 data-i18n="shared_access">Current access</h4>
+            <div id="share-list" class="sh-list"></div>
+          </section>
+          <p id="share-error" class="alert" hidden></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

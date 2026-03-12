@@ -1,0 +1,60 @@
+<link rel="stylesheet" href="/static/styles.css" />
+<section class="sh-section sh-library-page" id="profile-page">
+  <div class="sh-library-hero">
+    <div>
+      <p class="sh-library-hero-copy" data-i18n="profile_manage_hint">Manage your account details and password.</p>
+    </div>
+  </div>
+
+  <div class="sh-library-grid">
+    <section class="sh-library-panel">
+      <div class="sh-library-panel-head">
+        <div>
+          <h3 data-i18n="profile">Profile</h3>
+          <p class="sh-library-panel-copy" data-i18n="profile_manage_hint">Manage your account details and password.</p>
+        </div>
+      </div>
+      <p id="profile-error" class="alert" hidden></p>
+      <form id="profile-form" class="sh-detail-edit-form">
+        <label class="sh-detail-edit-field"><span data-i18n="nickname">Nickname</span><input type="text" id="profile-display-name" disabled /></label>
+        <label class="sh-detail-edit-field"><span data-i18n="username">Username</span><input type="text" id="profile-username" disabled /></label>
+        <label class="sh-settings-toggle">
+          <input type="checkbox" id="profile-public" disabled />
+          <span data-i18n="profile_public">Show profile to other users</span>
+        </label>
+        <div class="sh-detail-edit-actions">
+          <button type="button" class="btn ghost" id="profile-edit-btn" data-i18n="edit">Edit</button>
+          <button type="submit" class="btn primary" id="profile-save-btn" data-i18n="save" disabled>Save</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="sh-library-panel">
+      <div class="sh-library-panel-head">
+        <div>
+          <h3 data-i18n="change_password">Change password</h3>
+          <p class="sh-library-panel-copy" data-i18n="change_password">Change password</p>
+        </div>
+      </div>
+      <p id="profile-password-error" class="alert" hidden></p>
+      <form id="profile-password-form" class="sh-detail-edit-form">
+        <label class="sh-detail-edit-field"><span data-i18n="current_password">Current password</span><input type="password" id="profile-current-password" required /></label>
+        <label class="sh-detail-edit-field"><span data-i18n="new_password">New password</span><input type="password" id="profile-new-password" required /></label>
+        <label class="sh-detail-edit-field"><span data-i18n="repeat_password">Repeat password</span><input type="password" id="profile-repeat-password" required /></label>
+        <div class="sh-detail-edit-actions">
+          <button type="submit" class="btn primary" data-i18n="save">Save</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="sh-library-panel">
+      <div class="sh-library-panel-head">
+        <div>
+          <h3 data-i18n="shared_with_me">Shared with me</h3>
+          <p class="sh-library-panel-copy" data-i18n="shared_with_me_hint">Entities that other users shared with you.</p>
+        </div>
+      </div>
+      <div id="profile-shared-list" class="sh-list"></div>
+    </section>
+  </div>
+</section>
