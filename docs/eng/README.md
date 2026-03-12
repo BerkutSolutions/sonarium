@@ -3,7 +3,6 @@
 ## Main
 
 - Root README: [../../README.en.md](../../README.en.md)
-- GitHub publishing guide: [github_publish.md](github_publish.md)
 
 ## Technical Docs
 
@@ -20,7 +19,6 @@
 - `.env.example`
 - Docker Compose startup instructions
 - short feature overview
-- GitHub publishing instructions
 
 ## Screenshots
 

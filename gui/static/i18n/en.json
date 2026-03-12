@@ -100,7 +100,7 @@
   "server": "Server",
   "version": "Version",
   "updates": "Updates",
-  "updates_manage_hint": "Check the latest release on GitHub.",
+  "updates_manage_hint": "Check the latest available version.",
   "check_updates": "Check updates",
   "checking_updates": "Checking...",
   "update_check_failed": "Failed to check updates",

@@ -118,31 +118,6 @@ Core documents:
 - API: [docs/api.md](docs/api.md)
 - Docker strategy: [docs/docker_strategy.md](docs/docker_strategy.md)
 - Repository structure: [docs/repository_structure.md](docs/repository_structure.md)
-- GitHub publishing: [docs/eng/github_publish.md](docs/eng/github_publish.md)
-
-## Publish to GitHub
-
-If GitHub CLI is installed:
-
-```bash
-git init
-git add .
-git commit -m "Initial Sonarium release"
-git branch -M main
-gh auth login
-gh repo create sonarium --public --source . --remote origin --push
-```
-
-If you create the repository manually on GitHub:
-
-```bash
-git init
-git add .
-git commit -m "Initial Sonarium release"
-git branch -M main
-git remote add origin https://github.com/<your-username>/sonarium.git
-git push -u origin main
-```
 
 ## Stack
 

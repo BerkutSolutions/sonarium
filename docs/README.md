@@ -15,8 +15,6 @@
 
 Материалы для публикации проекта:
 
-- GitHub publish guide RU: [ru/github_publish.md](ru/github_publish.md)
-- GitHub publish guide EN: [eng/github_publish.md](eng/github_publish.md)
 
 Скриншоты для README:
 

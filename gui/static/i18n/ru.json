@@ -100,7 +100,7 @@
   "server": "Сервер",
   "version": "Версия",
   "updates": "Обновления",
-  "updates_manage_hint": "Проверьте последнюю версию на GitHub.",
+  "updates_manage_hint": "Проверьте последнюю доступную версию.",
   "check_updates": "Проверить обновления",
   "checking_updates": "Проверка...",
   "update_check_failed": "Не удалось проверить обновления",

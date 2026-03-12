@@ -56,7 +56,7 @@ Sonarium — единая среда для личной или командно
   - первый пользователь становится admin
   - управление пользователями
   - включение и отключение регистрации
-  - проверка обновлений с GitHub в Settings
+  - проверка обновлений в Settings
 - Совместимость:
   - REST API
   - Subsonic adapter (`/rest`)
@@ -135,7 +135,6 @@ docker compose down -v
 - API: [docs/api.md](docs/api.md)
 - Docker strategy: [docs/docker_strategy.md](docs/docker_strategy.md)
 - Структура репозитория: [docs/repository_structure.md](docs/repository_structure.md)
-- Публикация на GitHub: [docs/ru/github_publish.md](docs/ru/github_publish.md)
 
 ## Лицензия
 
