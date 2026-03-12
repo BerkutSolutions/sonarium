@@ -137,29 +137,6 @@ docker compose down -v
 - Структура репозитория: [docs/repository_structure.md](docs/repository_structure.md)
 - Публикация на GitHub: [docs/ru/github_publish.md](docs/ru/github_publish.md)
 
-## Публикация образа в GHCR
-
-```bash
-docker build -t sonarium:1.0.0 -f Dockerfile .
-
-docker tag sonarium:1.0.0 ghcr.io/<your-github-username>/sonarium:1.0.0
-docker tag sonarium:1.0.0 ghcr.io/<your-github-username>/sonarium:latest
-docker push ghcr.io/<your-github-username>/sonarium:1.0.0
-docker push ghcr.io/<your-github-username>/sonarium:latest
-```
-
-## Публикация на GitHub
-
-Если репозиторий уже создан на GitHub:
-
-```bash
-git add .
-git commit -m "Initial Sonarium release"
-git branch -M main
-git remote add origin https://github.com/<your-username>/sonarium.git
-git push -u origin main
-```
-
 ## Лицензия
 
 [LICENSE](LICENSE)
