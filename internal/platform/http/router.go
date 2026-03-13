@@ -130,6 +130,10 @@ func NewRouter(
 			api.Post("/library/albums/create", libraryHandler.CreateAlbum)
 			api.Get("/settings", libraryHandler.Settings)
 			api.Post("/settings/updates/check", libraryHandler.CheckUpdates)
+			api.Post("/settings/updates/auto", libraryHandler.SetAutoCheckUpdates)
+			api.Get("/settings/storage", libraryHandler.StorageUsage)
+			api.Post("/settings/library/delete-all", libraryHandler.DeleteAllMusic)
+			api.Post("/settings/upload-concurrency", libraryHandler.SetUploadConcurrency)
 
 			api.Get("/player/state", playerHandler.GetState)
 			api.Post("/player/state", playerHandler.SetState)

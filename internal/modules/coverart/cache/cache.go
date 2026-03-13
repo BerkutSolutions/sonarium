@@ -31,18 +31,12 @@ func New(dataPath string) (*Cache, error) {
 	original := filepath.Join(root, "original")
 	thumb := filepath.Join(root, "thumb")
 
-	for _, p := range []string{root, original, thumb} {
-		if err := os.MkdirAll(p, 0o755); err != nil {
-			return nil, fmt.Errorf("create cover cache dir %s: %w", p, err)
-		}
-	}
-
 	cache := &Cache{
 		rootPath:     root,
 		originalPath: original,
 		thumbPath:    thumb,
 	}
-	if err := cache.ensurePlaceholder(); err != nil {
+	if err := cache.ensureLayout(); err != nil {
 		return nil, err
 	}
 
@@ -52,6 +46,9 @@ func New(dataPath string) (*Cache, error) {
 func (c *Cache) SaveOriginal(data []byte, mimeType string) (string, error) {
 	if len(data) == 0 {
 		return "", fmt.Errorf("empty cover data")
+	}
+	if err := c.ensureLayout(); err != nil {
+		return "", err
 	}
 	ext := extByMIME(mimeType)
 	hash := sha1.Sum(data)
@@ -71,6 +68,15 @@ func (c *Cache) ThumbPath(originalPath string, size int) (string, error) {
 	if _, ok := SupportedThumbSizes[size]; !ok {
 		return "", fmt.Errorf("unsupported thumb size %d", size)
 	}
+	if err := c.ensureLayout(); err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(originalPath) == "" {
+		return c.PlaceholderPath(size)
+	}
+	if _, err := os.Stat(originalPath); err != nil {
+		return c.PlaceholderPath(size)
+	}
 	fileName := strings.TrimSuffix(filepath.Base(originalPath), filepath.Ext(originalPath)) + ".jpg"
 	dir := filepath.Join(c.thumbPath, fmt.Sprintf("%d", size))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -81,17 +87,21 @@ func (c *Cache) ThumbPath(originalPath string, size int) (string, error) {
 		return target, nil
 	}
 
-	decoded, _, err := image.DecodeConfig(bytes.NewReader(mustRead(originalPath)))
+	originalData, err := os.ReadFile(originalPath)
 	if err != nil {
-		return "", fmt.Errorf("decode image config: %w", err)
+		return c.PlaceholderPath(size)
+	}
+	decoded, _, err := image.DecodeConfig(bytes.NewReader(originalData))
+	if err != nil {
+		return c.PlaceholderPath(size)
 	}
 	if decoded.Width == 0 || decoded.Height == 0 {
-		return "", fmt.Errorf("invalid image dimensions")
+		return c.PlaceholderPath(size)
 	}
 
-	img, _, err := image.Decode(bytes.NewReader(mustRead(originalPath)))
+	img, _, err := image.Decode(bytes.NewReader(originalData))
 	if err != nil {
-		return "", fmt.Errorf("decode image: %w", err)
+		return c.PlaceholderPath(size)
 	}
 	thumb := resizeNearest(img, size, size)
 
@@ -106,6 +116,9 @@ func (c *Cache) ThumbPath(originalPath string, size int) (string, error) {
 }
 
 func (c *Cache) PlaceholderPath(size int) (string, error) {
+	if err := c.ensureLayout(); err != nil {
+		return "", err
+	}
 	if size == 0 {
 		return filepath.Join(c.originalPath, "placeholder.png"), nil
 	}
@@ -125,6 +138,9 @@ func (c *Cache) thumbFromPlaceholder(original string, size int) (string, error) 
 	if _, ok := SupportedThumbSizes[size]; !ok {
 		return "", fmt.Errorf("unsupported thumb size %d", size)
 	}
+	if err := c.ensureLayout(); err != nil {
+		return "", err
+	}
 	dir := filepath.Join(c.thumbPath, fmt.Sprintf("%d", size))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
@@ -133,7 +149,11 @@ func (c *Cache) thumbFromPlaceholder(original string, size int) (string, error) 
 	if _, err := os.Stat(target); err == nil {
 		return target, nil
 	}
-	img, _, err := image.Decode(bytes.NewReader(mustRead(original)))
+	originalData, err := os.ReadFile(original)
+	if err != nil {
+		return "", err
+	}
+	img, _, err := image.Decode(bytes.NewReader(originalData))
 	if err != nil {
 		return "", err
 	}
@@ -176,6 +196,18 @@ func (c *Cache) ensurePlaceholder() error {
 	return nil
 }
 
+func (c *Cache) ensureLayout() error {
+	for _, p := range []string{c.rootPath, c.originalPath, c.thumbPath} {
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			return fmt.Errorf("create cover cache dir %s: %w", p, err)
+		}
+	}
+	if err := c.ensurePlaceholder(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func extByMIME(mimeType string) string {
 	switch strings.ToLower(strings.TrimSpace(mimeType)) {
 	case "image/png":
@@ -183,14 +215,6 @@ func extByMIME(mimeType string) string {
 	default:
 		return ".jpg"
 	}
-}
-
-func mustRead(path string) []byte {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil
-	}
-	return data
 }
 
 func resizeNearest(src image.Image, width, height int) *image.RGBA {

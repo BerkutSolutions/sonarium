@@ -41,6 +41,8 @@ export class Player {
     this._visualizerFrame = 0;
     this._progressFrame = 0;
     this._restoredCurrentTime = 0;
+    this._progressAnchorTime = 0;
+    this._progressAnchorPerf = 0;
     this._dragQueueIndex = -1;
     this._queueOutsideClickHandler = (event) => {
       if (!this.queuePanel.classList.contains('open')) return;
@@ -129,6 +131,7 @@ export class Player {
       const nextTime = (Number(this.progress.value) / 10000) * this.audio.duration;
       this.audio.currentTime = nextTime;
       this._restoredCurrentTime = nextTime;
+      this._syncProgressAnchor(nextTime);
       this.currentTime.textContent = formatTime(Math.floor(nextTime));
       this._setProgressVisual(this.audio.duration ? (nextTime / this.audio.duration) : 0);
       this._scheduleSync();
@@ -137,6 +140,7 @@ export class Player {
     this.audio.addEventListener('play', () => {
       this.isPlaying = true;
       this._restoredCurrentTime = Math.max(0, Number(this.audio.currentTime || this._restoredCurrentTime || 0));
+      this._syncProgressAnchor(this._restoredCurrentTime);
       this._startVisualizer();
       this._startProgressLoop();
       this._renderControls();
@@ -145,6 +149,7 @@ export class Player {
     this.audio.addEventListener('pause', () => {
       this.isPlaying = false;
       this._restoredCurrentTime = Math.max(0, Number(this.audio.currentTime || this._restoredCurrentTime || 0));
+      this._syncProgressAnchor(this._restoredCurrentTime);
       this._stopVisualizer();
       this._stopProgressLoop();
       this._renderProgress();
@@ -153,6 +158,7 @@ export class Player {
     });
     this.audio.addEventListener('timeupdate', () => {
       this._restoredCurrentTime = Math.max(0, Number(this.audio.currentTime || this._restoredCurrentTime || 0));
+      this._syncProgressAnchor(this._restoredCurrentTime);
       this._renderProgress();
     });
     this.audio.addEventListener('loadedmetadata', () => {
@@ -163,7 +169,16 @@ export class Player {
           // best-effort restore
         }
       }
+      this._syncProgressAnchor(Math.max(0, Number(this.audio.currentTime || this._restoredCurrentTime || 0)));
       this.duration.textContent = formatTime(Math.floor(this.audio.duration || 0));
+      this._renderProgress();
+    });
+    this.audio.addEventListener('seeking', () => {
+      this._syncProgressAnchor(Math.max(0, Number(this.audio.currentTime || this._restoredCurrentTime || 0)));
+    });
+    this.audio.addEventListener('seeked', () => {
+      this._restoredCurrentTime = Math.max(0, Number(this.audio.currentTime || this._restoredCurrentTime || 0));
+      this._syncProgressAnchor(this._restoredCurrentTime);
       this._renderProgress();
     });
     this.audio.addEventListener('ended', () => {
@@ -236,6 +251,7 @@ export class Player {
 
     this.audio.pause();
     this._restoredCurrentTime = 0;
+    this._syncProgressAnchor(0);
     try {
       this.audio.currentTime = 0;
     } catch (_) {
@@ -916,9 +932,23 @@ export class Player {
     this.volume.style.setProperty('--volume-pct', `${Math.round(safe * 100)}%`);
   }
 
+  _syncProgressAnchor(seconds = 0) {
+    this._progressAnchorTime = Math.max(0, Number(seconds || 0));
+    this._progressAnchorPerf = performance.now();
+  }
+
+  _currentPlaybackSeconds() {
+    const base = Math.max(0, Number(this._progressAnchorTime || this._restoredCurrentTime || this.audio.currentTime || 0));
+    if (this.audio.paused || this.audio.ended) {
+      return base;
+    }
+    const elapsed = Math.max(0, performance.now() - Number(this._progressAnchorPerf || 0));
+    return base + (elapsed / 1000) * Math.max(0, Number(this.audio.playbackRate || 1));
+  }
+
   _renderProgress() {
     const durationSeconds = this._currentDurationSeconds();
-    const currentSeconds = Math.max(0, Number(this.audio.currentTime || this._restoredCurrentTime || 0));
+    const currentSeconds = Math.max(0, this._currentPlaybackSeconds());
     if (!durationSeconds || !Number.isFinite(durationSeconds)) {
       this.progress.value = '0';
       this.currentTime.textContent = formatTime(Math.floor(currentSeconds));

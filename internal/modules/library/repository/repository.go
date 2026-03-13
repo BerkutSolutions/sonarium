@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"math/rand"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -95,8 +97,177 @@ type ArtistUpdateInput struct {
 	MergeIntoArtistID string
 }
 
+type StorageUserUsage struct {
+	UserID      string `json:"user_id"`
+	DisplayName string `json:"display_name"`
+	TrackCount  int    `json:"track_count"`
+	BytesUsed   int64  `json:"bytes_used"`
+}
+
+type StorageUsage struct {
+	TotalBytes int64              `json:"total_bytes"`
+	Users      []StorageUserUsage `json:"users"`
+}
+
 func New(db *sql.DB) *Repository {
 	return &Repository{db: db}
+}
+
+func (r *Repository) UploadConcurrency(ctx context.Context) (int, error) {
+	var raw string
+	err := r.db.QueryRowContext(ctx, `
+		SELECT value
+		FROM app_settings
+		WHERE key = 'upload_concurrency'
+	`).Scan(&raw)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 4, nil
+		}
+		return 0, fmt.Errorf("query upload concurrency: %w", err)
+	}
+	value, convErr := strconv.Atoi(raw)
+	if convErr != nil {
+		return 4, nil
+	}
+	if value < 1 {
+		return 1, nil
+	}
+	if value > 10 {
+		return 10, nil
+	}
+	return value, nil
+}
+
+func (r *Repository) SetUploadConcurrency(ctx context.Context, value int) error {
+	if value < 1 {
+		value = 1
+	}
+	if value > 10 {
+		value = 10
+	}
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO app_settings (key, value, updated_at)
+		VALUES ('upload_concurrency', $1, NOW())
+		ON CONFLICT (key) DO UPDATE
+		SET value = EXCLUDED.value, updated_at = NOW()
+	`, strconv.Itoa(value))
+	if err != nil {
+		return fmt.Errorf("save upload concurrency: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) AutoCheckUpdates(ctx context.Context) (bool, error) {
+	var raw string
+	err := r.db.QueryRowContext(ctx, `
+		SELECT value
+		FROM app_settings
+		WHERE key = 'auto_check_updates'
+	`).Scan(&raw)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return true, nil
+		}
+		return false, fmt.Errorf("query auto check updates: %w", err)
+	}
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", "1", "true", "yes", "on":
+		return true, nil
+	default:
+		return false, nil
+	}
+}
+
+func (r *Repository) SetAutoCheckUpdates(ctx context.Context, value bool) error {
+	raw := "false"
+	if value {
+		raw = "true"
+	}
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO app_settings (key, value, updated_at)
+		VALUES ('auto_check_updates', $1, NOW())
+		ON CONFLICT (key) DO UPDATE
+		SET value = EXCLUDED.value, updated_at = NOW()
+	`, raw)
+	if err != nil {
+		return fmt.Errorf("save auto check updates: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) StorageUsage(ctx context.Context) (StorageUsage, error) {
+	var total int64
+	if err := r.db.QueryRowContext(ctx, `
+		SELECT COALESCE(SUM(file_size_bytes), 0)
+		FROM tracks
+	`).Scan(&total); err != nil {
+		return StorageUsage{}, fmt.Errorf("query total storage: %w", err)
+	}
+
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT
+			COALESCE(t.uploaded_by_user_id, 'system') AS user_id,
+			COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), 'System') AS display_name,
+			COUNT(*) AS track_count,
+			COALESCE(SUM(t.file_size_bytes), 0) AS bytes_used
+		FROM tracks t
+		LEFT JOIN app_users u ON u.id = t.uploaded_by_user_id
+		GROUP BY COALESCE(t.uploaded_by_user_id, 'system'), COALESCE(NULLIF(u.display_name, ''), NULLIF(u.username, ''), 'System')
+		ORDER BY bytes_used DESC, display_name ASC
+	`)
+	if err != nil {
+		return StorageUsage{}, fmt.Errorf("query per-user storage: %w", err)
+	}
+	defer rows.Close()
+
+	users := make([]StorageUserUsage, 0)
+	for rows.Next() {
+		var item StorageUserUsage
+		if err := rows.Scan(&item.UserID, &item.DisplayName, &item.TrackCount, &item.BytesUsed); err != nil {
+			return StorageUsage{}, fmt.Errorf("scan storage usage: %w", err)
+		}
+		users = append(users, item)
+	}
+	if err := rows.Err(); err != nil {
+		return StorageUsage{}, fmt.Errorf("iterate storage usage: %w", err)
+	}
+
+	return StorageUsage{TotalBytes: total, Users: users}, nil
+}
+
+func (r *Repository) ClearLibrary(ctx context.Context) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin clear library tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	statements := []string{
+		`DELETE FROM entity_shares WHERE entity_type IN ('album', 'artist', 'track')`,
+		`DELETE FROM play_history`,
+		`DELETE FROM user_favorite_tracks`,
+		`DELETE FROM user_favorite_albums`,
+		`DELETE FROM user_favorite_artists`,
+		`DELETE FROM playlist_tracks`,
+		`DELETE FROM tracks`,
+		`DELETE FROM albums`,
+		`DELETE FROM artists`,
+		`DELETE FROM library_file_fingerprints`,
+		`DELETE FROM library_album_stats`,
+		`DELETE FROM library_artist_stats`,
+		`UPDATE library SET last_scan_at = NULL WHERE id = TRUE`,
+	}
+	for _, stmt := range statements {
+		if _, err := tx.ExecContext(ctx, stmt); err != nil {
+			return fmt.Errorf("clear library: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit clear library tx: %w", err)
+	}
+	return nil
 }
 
 func (r *Repository) RecordPlayEvent(ctx context.Context, userID string, event PlayEvent) error {

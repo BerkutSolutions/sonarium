@@ -8,6 +8,7 @@
     color: #fff;
     margin: 0;
     overflow: auto;
+    scrollbar-gutter: stable;
     scrollbar-width: thin;
   }
 
@@ -499,11 +500,13 @@
     box-shadow: 0 0 0 2px rgba(125, 155, 255, 0.34), 0 8px 22px rgba(0, 0, 0, 0.35);
   }
 
-  .sidebar-footer .app-version {
-    margin-top: 8px;
-    text-align: center;
-    font-size: 12px;
-  }
+.sidebar-footer .app-version {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: rgba(232, 238, 255, 0.58);
+}
 
   .profile-hover-card {
     position: fixed;
@@ -4649,6 +4652,14 @@
 
 .container-control-actions .btn {
   width: 100%;
+}
+
+body.auth-pending .sh-app,
+body.auth-pending #player-root,
+body.auth-pending #auth-overlay {
+  visibility: hidden;
+  pointer-events: none;
+  user-select: none;
 }
 
 body.auth-locked .sh-app,
@@ -13047,8 +13058,9 @@ body.sh-modal-open {
 }
 
 .sh-player-progress-overlay #player-time-current {
-  left: var(--progress-chip-x, 34px) !important;
-  transform: translate(-50%, -100%) !important;
+  left: 0 !important;
+  transform: translate3d(var(--progress-chip-x, 34px), -100%, 0) translateX(-50%) !important;
+  will-change: transform !important;
 }
 
 .sh-player-progress-overlay #player-time-duration {
@@ -13073,11 +13085,12 @@ body.sh-modal-open {
 #player-progress-dot {
   position: absolute !important;
   top: 4px !important;
-  left: var(--progress-dot-x, 0px) !important;
+  left: 0 !important;
   width: 14px !important;
   height: 14px !important;
   border-radius: 50% !important;
-  transform: translate(-50%, -50%) !important;
+  transform: translate3d(var(--progress-dot-x, 0px), -50%, 0) translateX(-50%) !important;
+  will-change: transform !important;
   background: #7f9ddb !important;
   border: 2px solid rgba(12, 18, 32, 0.96) !important;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28) !important;
@@ -13803,6 +13816,8 @@ body.sh-modal-open {
   gap: 14px;
   max-height: min(42vh, 420px);
   overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
   padding-right: 8px;
 }
 
@@ -13863,6 +13878,18 @@ body.sh-modal-open {
 .sh-search-page #search-results {
   display: grid;
   gap: 16px;
+}
+
+.sh-search-album-grid {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 2px 12px;
+}
+
+.sh-search-album-grid > p {
+  margin: 0;
 }
 
 .sh-search-page #search-results > .sh-section {
@@ -14376,6 +14403,24 @@ body.sh-modal-open {
   background: rgba(8, 13, 25, 0.52);
 }
 
+.sh-settings-toggle-inline {
+  margin: 0 0 14px;
+}
+
+#settings-upload-panel .sh-list-row-input {
+  padding: 10px 12px;
+}
+
+#settings-upload-panel .sh-inline-form {
+  padding: 8px 10px;
+  gap: 10px;
+}
+
+#settings-upload-panel select,
+#settings-upload-panel .btn {
+  min-height: 36px;
+}
+
 .sh-home-block {
   border: 1px solid rgba(100, 124, 184, 0.16);
   border-radius: 22px;
@@ -14851,4 +14896,169 @@ body.sh-modal-open {
 @keyframes shWaveGlow {
   0%, 100% { opacity: 0.72; transform: translate(-50%, -50%) scale(1); }
   50% { opacity: 0.96; transform: translate(-50%, -50%) scale(1.08); }
+}
+
+.sh-library-upload-progress {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(88, 111, 178, 0.18);
+  background: linear-gradient(180deg, rgba(8, 14, 28, 0.94), rgba(6, 10, 21, 0.98));
+}
+
+.sh-library-progress-bar,
+.sh-upload-item-bar {
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sh-library-progress-bar {
+  height: 8px;
+  margin: 10px 0 14px;
+}
+
+.sh-library-progress-bar span,
+.sh-upload-item-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #6e8cff, #8b6dff);
+}
+
+.sh-library-upload-list {
+  max-height: 260px;
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+  padding-right: 4px;
+}
+
+.sh-upload-item {
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(88, 111, 178, 0.16);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.sh-upload-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.sh-upload-item-head strong,
+.sh-upload-item-head span {
+  font-size: 13px;
+}
+
+.sh-upload-item-head strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sh-upload-item-head span {
+  color: rgba(230, 236, 255, 0.72);
+  flex-shrink: 0;
+}
+
+.sh-upload-item-bar {
+  height: 6px;
+}
+
+.sh-upload-item[data-state="failed"] .sh-upload-item-bar span {
+  background: linear-gradient(90deg, #ff7d7d, #ff4d6d);
+}
+
+.sh-upload-item[data-state="cancelled"] .sh-upload-item-bar span {
+  background: linear-gradient(90deg, #6f7a96, #556079);
+}
+
+.sh-global-upload-panel {
+  position: fixed;
+  right: 18px;
+  bottom: 110px;
+  z-index: 1400;
+  width: min(420px, calc(100vw - 28px));
+  max-height: min(62vh, 520px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(88, 111, 178, 0.24);
+  background:
+    radial-gradient(circle at top right, rgba(72, 110, 220, 0.16), transparent 38%),
+    linear-gradient(180deg, rgba(8, 13, 27, 0.985), rgba(5, 8, 18, 0.985));
+  box-shadow:
+    0 22px 56px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(18px);
+}
+
+.sh-global-upload-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.sh-global-upload-title {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.sh-global-upload-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.sh-global-upload-head strong,
+.sh-global-upload-head span {
+  display: block;
+}
+
+.sh-global-upload-head strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.sh-global-upload-head span {
+  margin-top: 4px;
+  color: rgba(224, 231, 255, 0.7);
+  font-size: 12px;
+}
+
+.sh-global-upload-close {
+  border: 0;
+  background: transparent;
+  color: rgba(232, 238, 255, 0.82);
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.sh-global-upload-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.sh-global-upload-panel .sh-library-upload-list {
+  max-height: min(42vh, 360px);
+  overflow: auto;
+  padding-right: 4px;
 }

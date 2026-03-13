@@ -85,7 +85,11 @@ export function createAuthManager() {
 
   async function init() {
     bind();
-    status = await API.getAuthStatus();
+    try {
+      status = await API.getAuthStatus();
+    } catch {
+      status = { authenticated: false, registration_open: false, setup_required: false };
+    }
     applyStatus(status);
     return status;
   }
@@ -93,6 +97,7 @@ export function createAuthManager() {
   function applyStatus(nextStatus) {
     status = nextStatus || {};
     currentUser = status.user || null;
+    document.body.classList.remove('auth-pending');
     document.body.classList.toggle('auth-locked', !status.authenticated);
     if (overlay) overlay.hidden = Boolean(status.authenticated);
     if (loginView) loginView.hidden = Boolean(status.setup_required);

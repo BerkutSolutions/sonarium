@@ -12,21 +12,19 @@
 - Modules: [../modules.md](../modules.md)
 - Repository structure: [../repository_structure.md](../repository_structure.md)
 
-## Recommended release package
+## Recommended Release Package
 
-- README with screenshots
+- `README.md`
+- `README.en.md`
 - `LICENSE`
 - `.env.example`
 - Docker Compose startup instructions
-- short feature overview
+- Short feature overview
 
 ## Screenshots
 
-Place images into:
+Current screenshots used by `README.en.md`:
 
-- `docs/assets/screenshots/home.png`
-- `docs/assets/screenshots/library.png`
-- `docs/assets/screenshots/player.png`
-- `docs/assets/screenshots/login.png`
-
-They will be rendered automatically in `README.en.md`.
+- `gui/static/screen1.png`
+- `gui/static/screen2.png`
+- `gui/static/screen3.png`

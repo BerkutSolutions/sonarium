@@ -1,8 +1,12 @@
 package metadata
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"math"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -52,18 +56,15 @@ func (r *Reader) Read(filePath string) (AudioMetadata, error) {
 	trackNo, _ := meta.Track()
 	metadata := AudioMetadata{
 		Artist:      normalizePrimaryArtist(meta.Artist()),
-		Album:       strings.TrimSpace(meta.Album()),
-		Title:       strings.TrimSpace(meta.Title()),
-		Genre:       strings.TrimSpace(meta.Genre()),
+		Album:       normalizeTagText(meta.Album()),
+		Title:       normalizeTagText(meta.Title()),
+		Genre:       normalizeTagText(meta.Genre()),
 		TrackNumber: trackNo,
 		Year:        meta.Year(),
 	}
 
 	if raw, ok := meta.(interface{ Length() time.Duration }); ok {
 		metadata.Duration = raw.Length()
-	}
-	if metadata.Duration <= 0 {
-		metadata.Duration = 1 * time.Second
 	}
 
 	if audioFormat, ok := meta.(interface{ Format() tag.Format }); ok {
@@ -85,6 +86,17 @@ func (r *Reader) Read(filePath string) (AudioMetadata, error) {
 				break
 			}
 		}
+	}
+	if metadata.Bitrate <= 0 {
+		metadata.Bitrate = 0
+	}
+
+	if metadata.Duration <= time.Second || metadata.Bitrate <= 0 {
+		r.enrichWithFFprobe(filePath, &metadata)
+	}
+
+	if metadata.Duration <= 0 {
+		metadata.Duration = 1 * time.Second
 	}
 	if metadata.Bitrate <= 0 {
 		metadata.Bitrate = 320
@@ -113,7 +125,7 @@ func (r *Reader) Read(filePath string) (AudioMetadata, error) {
 }
 
 func normalizePrimaryArtist(value string) string {
-	artist := strings.TrimSpace(value)
+	artist := normalizeTagText(value)
 	if artist == "" {
 		return ""
 	}
@@ -143,6 +155,10 @@ func normalizePrimaryArtist(value string) string {
 	return strings.TrimSpace(artist)
 }
 
+func normalizeTagText(value string) string {
+	return strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
+}
+
 func parseReplayGain(raw map[string]any, keys []string) float64 {
 	for _, key := range keys {
 		value, ok := raw[key]
@@ -169,4 +185,48 @@ func parseReplayGain(raw map[string]any, keys []string) float64 {
 		}
 	}
 	return 0
+}
+
+func (r *Reader) enrichWithFFprobe(filePath string, metadata *AudioMetadata) {
+	if metadata == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(
+		ctx,
+		"ffprobe",
+		"-v", "error",
+		"-show_entries", "format=duration,bit_rate",
+		"-of", "json",
+		filePath,
+	)
+
+	output, err := cmd.Output()
+	if err != nil {
+		return
+	}
+
+	var payload struct {
+		Format struct {
+			Duration string `json:"duration"`
+			BitRate  string `json:"bit_rate"`
+		} `json:"format"`
+	}
+	if err := json.Unmarshal(output, &payload); err != nil {
+		return
+	}
+
+	if metadata.Duration <= 0 {
+		if seconds, err := strconv.ParseFloat(strings.TrimSpace(payload.Format.Duration), 64); err == nil && seconds > 0 {
+			metadata.Duration = time.Duration(math.Round(seconds * float64(time.Second)))
+		}
+	}
+	if metadata.Bitrate <= 0 {
+		if bitrate, err := strconv.Atoi(strings.TrimSpace(payload.Format.BitRate)); err == nil && bitrate > 0 {
+			metadata.Bitrate = bitrate / 1000
+		}
+	}
 }

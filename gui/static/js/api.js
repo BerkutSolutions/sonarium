@@ -115,11 +115,59 @@ export const API = {
     });
     return readEnvelope(response);
   },
+  uploadLibraryFileWithProgress(file, { onProgress, signal } = {}) {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/library/upload', true);
+      xhr.responseType = 'json';
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && typeof onProgress === 'function') {
+          onProgress({
+            loaded: event.loaded,
+            total: event.total,
+            percent: event.total > 0 ? Math.round((event.loaded / event.total) * 100) : 0
+          });
+        }
+      };
+      xhr.onload = () => {
+        const payload = xhr.response || safeParseJSON(xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300 && !payload?.error) {
+          resolve(payload?.data);
+          return;
+        }
+        reject(new Error(payload?.error?.message || 'API request failed'));
+      };
+      xhr.onerror = () => reject(new Error('Network error'));
+      xhr.onabort = () => reject(new Error('Upload cancelled'));
+      if (signal) {
+        if (signal.aborted) {
+          xhr.abort();
+          return;
+        }
+        signal.addEventListener('abort', () => xhr.abort(), { once: true });
+      }
+      xhr.send(form);
+    });
+  },
   async getSettings() {
     return request('/api/settings');
   },
   async checkUpdates() {
     return post('/api/settings/updates/check', {});
+  },
+  async setAutoCheckUpdates(enabled) {
+    return post('/api/settings/updates/auto', { enabled });
+  },
+  async getStorageUsage() {
+    return request('/api/settings/storage');
+  },
+  async deleteAllMusic() {
+    return post('/api/settings/library/delete-all', {});
+  },
+  async setUploadConcurrency(value) {
+    return post('/api/settings/upload-concurrency', { value });
   },
   async toggleFavoriteTrack(trackId) {
     return post(`/api/library/favorites/tracks/${encodeURIComponent(trackId)}/toggle`, {});
@@ -251,4 +299,12 @@ async function readEnvelope(response) {
     throw new Error(payload?.error?.message || 'API request failed');
   }
   return payload.data;
+}
+
+function safeParseJSON(value) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
 }

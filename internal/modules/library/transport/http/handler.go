@@ -42,9 +42,13 @@ type Management interface {
 	LibraryPath() string
 	ScanStatus() libraryservice.ScanState
 	TriggerScan() bool
-	SaveUpload(ctx context.Context, fileName string, src io.Reader) (string, error)
+	SaveUpload(ctx context.Context, userID, fileName string, src io.Reader) (string, error)
 	Settings(ctx context.Context) libraryservice.SettingsInfo
 	CheckUpdates(ctx context.Context) (*appmeta.UpdateCheckResult, error)
+	StorageUsage(ctx context.Context) (libraryrepo.StorageUsage, error)
+	DeleteAllMusic(ctx context.Context) error
+	SetUploadConcurrency(ctx context.Context, value int) error
+	SetAutoCheckUpdates(ctx context.Context, value bool) error
 }
 
 type Handler struct {
@@ -81,6 +85,14 @@ type mergeAlbumRequest struct {
 type updateArtistRequest struct {
 	Name             string `json:"name"`
 	ExistingArtistID string `json:"existing_artist_id"`
+}
+
+type uploadConcurrencyRequest struct {
+	Value int `json:"value"`
+}
+
+type autoCheckUpdatesRequest struct {
+	Enabled bool `json:"enabled"`
 }
 
 func NewHandler(service Service, management Management) *Handler {
@@ -193,7 +205,7 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	path, err := h.management.SaveUpload(r.Context(), header.Filename, file)
+	path, err := h.management.SaveUpload(r.Context(), currentUserID(r.Context()), header.Filename, file)
 	if err != nil {
 		response.WriteError(w, apperrors.NewBadRequest(err.Error()))
 		return
@@ -231,6 +243,89 @@ func (h *Handler) CheckUpdates(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.WriteOK(w, map[string]any{"data": result})
+}
+
+func (h *Handler) StorageUsage(w http.ResponseWriter, r *http.Request) {
+	current := authservice.CurrentUser(r.Context())
+	if current == nil {
+		response.WriteError(w, apperrors.AppError{Code: "unauthorized", Message: "login required", HTTPStatus: http.StatusUnauthorized})
+		return
+	}
+	if current.Role != authservice.RoleAdmin {
+		response.WriteError(w, apperrors.AppError{Code: "forbidden", Message: "forbidden", HTTPStatus: http.StatusForbidden})
+		return
+	}
+	usage, err := h.management.StorageUsage(r.Context())
+	if err != nil {
+		response.WriteError(w, apperrors.NewInternal("failed to load storage usage"))
+		return
+	}
+	response.WriteOK(w, map[string]any{"data": usage})
+}
+
+func (h *Handler) DeleteAllMusic(w http.ResponseWriter, r *http.Request) {
+	current := authservice.CurrentUser(r.Context())
+	if current == nil {
+		response.WriteError(w, apperrors.AppError{Code: "unauthorized", Message: "login required", HTTPStatus: http.StatusUnauthorized})
+		return
+	}
+	if current.Role != authservice.RoleAdmin {
+		response.WriteError(w, apperrors.AppError{Code: "forbidden", Message: "forbidden", HTTPStatus: http.StatusForbidden})
+		return
+	}
+	if err := h.management.DeleteAllMusic(r.Context()); err != nil {
+		response.WriteError(w, apperrors.NewInternal("failed to delete all music"))
+		return
+	}
+	response.WriteOK(w, map[string]any{"data": map[string]bool{"ok": true}})
+}
+
+func (h *Handler) SetUploadConcurrency(w http.ResponseWriter, r *http.Request) {
+	current := authservice.CurrentUser(r.Context())
+	if current == nil {
+		response.WriteError(w, apperrors.AppError{Code: "unauthorized", Message: "login required", HTTPStatus: http.StatusUnauthorized})
+		return
+	}
+	if current.Role != authservice.RoleAdmin {
+		response.WriteError(w, apperrors.AppError{Code: "forbidden", Message: "forbidden", HTTPStatus: http.StatusForbidden})
+		return
+	}
+	var req uploadConcurrencyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(w, apperrors.NewBadRequest("invalid request body"))
+		return
+	}
+	if req.Value < 1 || req.Value > 10 {
+		response.WriteError(w, apperrors.NewBadRequest("value must be between 1 and 10"))
+		return
+	}
+	if err := h.management.SetUploadConcurrency(r.Context(), req.Value); err != nil {
+		response.WriteError(w, apperrors.NewInternal("failed to save upload concurrency"))
+		return
+	}
+	response.WriteOK(w, map[string]any{"data": map[string]bool{"ok": true}})
+}
+
+func (h *Handler) SetAutoCheckUpdates(w http.ResponseWriter, r *http.Request) {
+	current := authservice.CurrentUser(r.Context())
+	if current == nil {
+		response.WriteError(w, apperrors.AppError{Code: "unauthorized", Message: "login required", HTTPStatus: http.StatusUnauthorized})
+		return
+	}
+	if current.Role != authservice.RoleAdmin {
+		response.WriteError(w, apperrors.AppError{Code: "forbidden", Message: "forbidden", HTTPStatus: http.StatusForbidden})
+		return
+	}
+	var req autoCheckUpdatesRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteError(w, apperrors.NewBadRequest("invalid request body"))
+		return
+	}
+	if err := h.management.SetAutoCheckUpdates(r.Context(), req.Enabled); err != nil {
+		response.WriteError(w, apperrors.NewInternal("failed to save auto update setting"))
+		return
+	}
+	response.WriteOK(w, map[string]any{"data": map[string]bool{"ok": true}})
 }
 
 func (h *Handler) DeleteTrack(w http.ResponseWriter, r *http.Request) {

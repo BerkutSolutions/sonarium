@@ -58,6 +58,20 @@
       </div>
 
       <p id="library-upload-result" class="sh-library-upload-result"></p>
+
+      <section id="library-upload-progress" class="sh-library-upload-progress" hidden>
+        <div class="sh-library-panel-head">
+          <div>
+            <h3 data-i18n="upload_progress">Прогресс загрузки</h3>
+            <p id="library-upload-summary" class="sh-library-panel-copy" data-i18n="upload_waiting">Ожидание начала загрузки.</p>
+          </div>
+          <button type="button" id="library-upload-cancel" class="btn ghost" data-i18n="cancel">Отмена</button>
+        </div>
+        <div class="sh-library-progress-bar">
+          <span id="library-upload-overall-bar"></span>
+        </div>
+        <div id="library-upload-list" class="sh-library-upload-list"></div>
+      </section>
     </section>
   </div>
 </section>

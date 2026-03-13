@@ -16,6 +16,8 @@ type Track struct {
 	Genre           string
 	Codec           string
 	Bitrate         int
+	FileSizeBytes   int64
+	UploadedByUserID string
 	ReplayGainTrack float64
 	ReplayGainAlbum float64
 	CreatedAt       time.Time

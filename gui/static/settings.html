@@ -2,7 +2,7 @@
 <section class="sh-section sh-library-page">
   <div class="sh-library-hero">
     <div>
-      <p class="sh-library-hero-copy" data-i18n="settings_manage_hint">View the current server configuration and library environment.</p>
+      <p class="sh-library-hero-copy" data-i18n="settings_manage_hint">Просматривайте текущую конфигурацию сервера и параметры музыкальной библиотеки.</p>
     </div>
   </div>
 
@@ -10,22 +10,85 @@
     <section class="sh-library-panel">
       <div class="sh-library-panel-head">
         <div>
-          <h3 data-i18n="server_info">Server Info</h3>
-          <p class="sh-library-panel-copy" data-i18n="server_info">Server Info</p>
+          <h3 data-i18n="server_info">Информация о сервере</h3>
+          <p class="sh-library-panel-copy" data-i18n="server_info">Информация о сервере</p>
         </div>
       </div>
       <div id="settings-content" class="sh-settings-list"></div>
     </section>
+
     <section class="sh-library-panel" id="settings-updates-panel" hidden>
       <div class="sh-library-panel-head">
         <div>
-          <h3 data-i18n="updates">Updates</h3>
-          <p class="sh-library-panel-copy" data-i18n="updates_manage_hint">Check the latest available version.</p>
+          <h3 data-i18n="updates">Обновления</h3>
+          <p class="sh-library-panel-copy" data-i18n="updates_manage_hint">Проверьте последнюю доступную версию.</p>
         </div>
-        <button type="button" class="btn ghost" id="settings-check-updates-btn" data-i18n="check_updates">Check updates</button>
+        <button type="button" class="btn ghost" id="settings-check-updates-btn" data-i18n="check_updates">Проверить обновления</button>
       </div>
+      <label class="sh-settings-toggle sh-settings-toggle-inline">
+        <input type="checkbox" id="settings-auto-check-updates" />
+        <span data-i18n="auto_check_updates">Автоматически проверять обновления</span>
+      </label>
       <div id="settings-updates-content" class="sh-settings-list"></div>
       <p id="settings-updates-error" class="alert" hidden></p>
     </section>
+
+    <section class="sh-library-panel" id="settings-upload-panel" hidden>
+      <div class="sh-library-panel-head">
+        <div>
+          <h3 data-i18n="upload_settings">Настройки загрузки</h3>
+          <p class="sh-library-panel-copy" data-i18n="upload_concurrency_hint">Выберите, сколько файлов можно загружать параллельно.</p>
+        </div>
+      </div>
+      <div class="sh-settings-list">
+        <div class="sh-list-row sh-list-row-input">
+          <span data-i18n="upload_concurrency">Параллельные загрузки</span>
+          <div class="sh-inline-form">
+            <select id="settings-upload-concurrency">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+              <option value="7">7</option>
+              <option value="8">8</option>
+              <option value="9">9</option>
+              <option value="10">10</option>
+            </select>
+            <button type="button" class="btn ghost" id="settings-upload-concurrency-save" data-i18n="save">Сохранить</button>
+          </div>
+        </div>
+      </div>
+      <p id="settings-upload-error" class="alert" hidden></p>
+    </section>
+
+    <section class="sh-library-panel" id="settings-storage-panel" hidden>
+      <div class="sh-library-panel-head">
+        <div>
+          <h3 data-i18n="storage_usage">Использование хранилища</h3>
+          <p class="sh-library-panel-copy" data-i18n="storage_usage_hint">Просматривайте, сколько места занимает музыкальная библиотека.</p>
+        </div>
+        <button type="button" class="btn danger" id="settings-delete-all-music-btn" data-i18n="delete_all_music">Удалить всю музыку</button>
+      </div>
+      <div id="settings-storage-content" class="sh-settings-list"></div>
+      <p id="settings-storage-error" class="alert" hidden></p>
+    </section>
   </div>
 </section>
+
+<div id="settings-delete-modal" class="sh-modal-backdrop" hidden>
+  <div class="sh-modal sh-settings-confirm-modal">
+    <header class="sh-modal-header">
+      <h3 data-i18n="delete_all_music">Удалить всю музыку</h3>
+      <button type="button" id="settings-delete-modal-close" class="sh-modal-close" aria-label="Close">×</button>
+    </header>
+    <div class="sh-modal-body">
+      <p class="sh-library-panel-copy" data-i18n="delete_all_music_confirm">Удалить всю музыкальную библиотеку? Это действие нельзя отменить.</p>
+    </div>
+    <footer class="sh-modal-footer">
+      <button type="button" class="btn ghost" id="settings-delete-modal-cancel" data-i18n="cancel">Отмена</button>
+      <button type="button" class="btn danger" id="settings-delete-modal-confirm" data-i18n="delete_all_music">Удалить всю музыку</button>
+    </footer>
+  </div>
+</div>

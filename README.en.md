@@ -4,18 +4,20 @@
   <img src="gui/static/logo.png" alt="Sonarium logo" width="220">
 </p>
 
-[Русская версия](README.md)
+[Russian version](README.md)
 
 Sonarium is a self-hosted music platform for local libraries: streaming, smart player UX, collections, collaboration, and a built-in web interface with no SaaS dependency.
 
+Current version: `1.0.1`
+
 ## Overview
 
-Sonarium runs through Docker Compose, stores data in dedicated Docker volumes, indexes local music, extracts cover art, and provides a full web UI with deep-link pages for albums, artists, tracks, playlists, and profiles.
+Sonarium runs through Docker Compose, stores data in dedicated Docker volumes, indexes local music, extracts metadata and cover art, and provides a full web UI with deep-link pages for albums, artists, tracks, playlists, genres, users, and profiles.
 
 It is designed for:
 - local self-hosted usage
 - zero-trust auth with sessions
-- collaborative playlist access
+- collaborative playlist access and sharing
 - large personal music libraries
 
 ## Key Features
@@ -31,39 +33,41 @@ It is designed for:
   - queue
   - drag-and-drop reorder
   - shuffle / repeat
-  - waveform / progress UI
+  - waveform and progress UI
+  - persistent playback state
 - Local library management:
   - directory scan
   - single-file and folder upload
   - metadata and cover extraction
   - genres, favorites, duplicate search
+  - inline editing and merge flows for library entities
 - Collaboration:
   - public share links
   - playlist access roles: listener / editor
   - user profile viewing
+  - "shared with me" view
 - Administration:
   - first user becomes admin
   - user management
   - registration policy control
+  - update checks in settings
+  - storage usage overview
+  - upload concurrency setting
 - Compatibility:
   - REST API
   - Subsonic adapter (`/rest`)
 
 ## Screenshots
 
-Place your screenshots into `docs/assets/screenshots/` with these names:
+Current repository screenshots:
 
-- `docs/assets/screenshots/home.png`
-- `docs/assets/screenshots/library.png`
-- `docs/assets/screenshots/player.png`
-- `docs/assets/screenshots/login.png`
+- `gui/static/screen1.png`
+- `gui/static/screen2.png`
+- `gui/static/screen3.png`
 
-The README is already wired to render them:
-
-![Home](docs/assets/screenshots/home.png)
-![Library](docs/assets/screenshots/library.png)
-![Player](docs/assets/screenshots/player.png)
-![Login](docs/assets/screenshots/login.png)
+![Screenshot 1](gui/static/screen1.png)
+![Screenshot 2](gui/static/screen2.png)
+![Screenshot 3](gui/static/screen3.png)
 
 ## Quick Start
 
@@ -91,9 +95,9 @@ http://localhost:8080
 
 Runtime data is stored in named Docker volumes:
 
-- `postgres_data` — PostgreSQL
-- `soundhub_data` — app data, thumbnails, service data
-- `soundhub_music` — music library
+- `postgres_data` - PostgreSQL
+- `soundhub_data` - app data, thumbnails, service data
+- `soundhub_music` - music library
 
 Inspect:
 
@@ -117,6 +121,7 @@ Core documents:
 - Architecture: [docs/architecture.md](docs/architecture.md)
 - API: [docs/api.md](docs/api.md)
 - Docker strategy: [docs/docker_strategy.md](docs/docker_strategy.md)
+- Modules: [docs/modules.md](docs/modules.md)
 - Repository structure: [docs/repository_structure.md](docs/repository_structure.md)
 
 ## Stack

@@ -5,7 +5,7 @@
 - Русский: [docs/ru/README.md](ru/README.md)
 - English: [docs/eng/README.md](eng/README.md)
 
-Технические документы текущей кодовой базы:
+Технические документы по текущей кодовой базе:
 
 - Архитектура: [architecture.md](architecture.md)
 - API: [api.md](api.md)
@@ -15,10 +15,15 @@
 
 Материалы для публикации проекта:
 
+- `README.md`
+- `README.en.md`
+- `LICENSE`
+- `.env.example`
+- `docker-compose.yml`
+- `docker-compose.local.yml`
 
-Скриншоты для README:
+Скриншоты, используемые в README:
 
-- `docs/assets/screenshots/home.png`
-- `docs/assets/screenshots/library.png`
-- `docs/assets/screenshots/player.png`
-- `docs/assets/screenshots/login.png`
+- `gui/static/screen1.png`
+- `gui/static/screen2.png`
+- `gui/static/screen3.png`

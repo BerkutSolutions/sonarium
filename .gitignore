@@ -3,6 +3,7 @@
 .env.local
 .env.*.local
 docker-compose.local.yml
+LOCAL_AI_RULES.md
 
 # Build artifacts
 *.exe

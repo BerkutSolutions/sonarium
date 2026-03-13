@@ -14,7 +14,8 @@
 
 ## Что рекомендуется приложить к релизу
 
-- README со скриншотами
+- `README.md`
+- `README.en.md`
 - `LICENSE`
 - `.env.example`
 - команды запуска через Docker Compose
@@ -22,11 +23,8 @@
 
 ## Скриншоты
 
-Положи изображения в:
+Текущие скриншоты, которые использует `README.md`:
 
-- `docs/assets/screenshots/home.png`
-- `docs/assets/screenshots/library.png`
-- `docs/assets/screenshots/player.png`
-- `docs/assets/screenshots/login.png`
-
-После этого они автоматически подтянутся в `README.md`.
+- `gui/static/screen1.png`
+- `gui/static/screen2.png`
+- `gui/static/screen3.png`

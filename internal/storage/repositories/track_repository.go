@@ -21,7 +21,7 @@ func NewTrackRepository(db *sql.DB) *TrackRepository {
 
 func (r *TrackRepository) List(ctx context.Context) ([]domain.Track, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, title, album_id, artist_id, track_number, duration_seconds, file_path, genre, codec, bitrate, replay_gain_track, replay_gain_album, created_at, updated_at
+		SELECT id, title, album_id, artist_id, track_number, duration_seconds, file_path, genre, codec, bitrate, file_size_bytes, COALESCE(uploaded_by_user_id, ''), replay_gain_track, replay_gain_album, created_at, updated_at
 		FROM tracks
 		ORDER BY artist_id, album_id, track_number ASC
 	`)
@@ -48,7 +48,7 @@ func (r *TrackRepository) List(ctx context.Context) ([]domain.Track, error) {
 
 func (r *TrackRepository) GetByID(ctx context.Context, id string) (domain.Track, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, title, album_id, artist_id, track_number, duration_seconds, file_path, genre, codec, bitrate, replay_gain_track, replay_gain_album, created_at, updated_at
+		SELECT id, title, album_id, artist_id, track_number, duration_seconds, file_path, genre, codec, bitrate, file_size_bytes, COALESCE(uploaded_by_user_id, ''), replay_gain_track, replay_gain_album, created_at, updated_at
 		FROM tracks
 		WHERE id = $1
 	`, id)
@@ -71,7 +71,7 @@ func (r *TrackRepository) GetByID(ctx context.Context, id string) (domain.Track,
 
 func (r *TrackRepository) GetByFilePath(ctx context.Context, filePath string) (domain.Track, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, title, album_id, artist_id, track_number, duration_seconds, file_path, genre, codec, bitrate, replay_gain_track, replay_gain_album, created_at, updated_at
+		SELECT id, title, album_id, artist_id, track_number, duration_seconds, file_path, genre, codec, bitrate, file_size_bytes, COALESCE(uploaded_by_user_id, ''), replay_gain_track, replay_gain_album, created_at, updated_at
 		FROM tracks
 		WHERE file_path = $1
 	`, filePath)
@@ -93,7 +93,7 @@ func (r *TrackRepository) GetByFilePath(ctx context.Context, filePath string) (d
 
 func (r *TrackRepository) ListByAlbumID(ctx context.Context, albumID string) ([]domain.Track, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, title, album_id, artist_id, track_number, duration_seconds, file_path, genre, codec, bitrate, replay_gain_track, replay_gain_album, created_at, updated_at
+		SELECT id, title, album_id, artist_id, track_number, duration_seconds, file_path, genre, codec, bitrate, file_size_bytes, COALESCE(uploaded_by_user_id, ''), replay_gain_track, replay_gain_album, created_at, updated_at
 		FROM tracks
 		WHERE album_id = $1
 		ORDER BY track_number ASC
@@ -121,7 +121,7 @@ func (r *TrackRepository) ListByAlbumID(ctx context.Context, albumID string) ([]
 
 func (r *TrackRepository) ListByArtistID(ctx context.Context, artistID string) ([]domain.Track, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, title, album_id, artist_id, track_number, duration_seconds, file_path, genre, codec, bitrate, replay_gain_track, replay_gain_album, created_at, updated_at
+		SELECT id, title, album_id, artist_id, track_number, duration_seconds, file_path, genre, codec, bitrate, file_size_bytes, COALESCE(uploaded_by_user_id, ''), replay_gain_track, replay_gain_album, created_at, updated_at
 		FROM tracks
 		WHERE artist_id = $1
 		ORDER BY album_id, track_number ASC
@@ -149,7 +149,7 @@ func (r *TrackRepository) ListByArtistID(ctx context.Context, artistID string) (
 
 func (r *TrackRepository) Search(ctx context.Context, query string) ([]domain.Track, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, title, album_id, artist_id, track_number, duration_seconds, file_path, genre, codec, bitrate, replay_gain_track, replay_gain_album, created_at, updated_at
+		SELECT id, title, album_id, artist_id, track_number, duration_seconds, file_path, genre, codec, bitrate, file_size_bytes, COALESCE(uploaded_by_user_id, ''), replay_gain_track, replay_gain_album, created_at, updated_at
 		FROM tracks
 		WHERE title ILIKE '%' || $1 || '%'
 		ORDER BY title ASC
@@ -178,12 +178,12 @@ func (r *TrackRepository) Search(ctx context.Context, query string) ([]domain.Tr
 func (r *TrackRepository) Upsert(ctx context.Context, track domain.Track) error {
 	_, err := r.db.ExecContext(ctx, `
 		INSERT INTO tracks (
-			id, title, album_id, artist_id, track_number, duration_seconds, file_path, genre, codec, bitrate, replay_gain_track, replay_gain_album, created_at, updated_at
+			id, title, album_id, artist_id, track_number, duration_seconds, file_path, genre, codec, bitrate, file_size_bytes, uploaded_by_user_id, replay_gain_track, replay_gain_album, created_at, updated_at
 		)
 		VALUES (
 			COALESCE(NULLIF($1, '')::uuid, gen_random_uuid()),
-			$2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-			COALESCE($13, NOW()),
+			$2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NULLIF($12, ''), $13, $14,
+			COALESCE($15, NOW()),
 			NOW()
 		)
 		ON CONFLICT (id) DO UPDATE
@@ -196,6 +196,8 @@ func (r *TrackRepository) Upsert(ctx context.Context, track domain.Track) error 
 			genre = EXCLUDED.genre,
 			codec = EXCLUDED.codec,
 			bitrate = EXCLUDED.bitrate,
+			file_size_bytes = EXCLUDED.file_size_bytes,
+			uploaded_by_user_id = EXCLUDED.uploaded_by_user_id,
 			replay_gain_track = EXCLUDED.replay_gain_track,
 			replay_gain_album = EXCLUDED.replay_gain_album,
 			updated_at = NOW()
@@ -210,6 +212,8 @@ func (r *TrackRepository) Upsert(ctx context.Context, track domain.Track) error 
 		track.Genre,
 		track.Codec,
 		track.Bitrate,
+		track.FileSizeBytes,
+		track.UploadedByUserID,
 		track.ReplayGainTrack,
 		track.ReplayGainAlbum,
 		track.CreatedAt,
@@ -239,6 +243,8 @@ func scanTrack(scanner rowScanner) (domain.Track, error) {
 		&track.Genre,
 		&track.Codec,
 		&track.Bitrate,
+		&track.FileSizeBytes,
+		&track.UploadedByUserID,
 		&track.ReplayGainTrack,
 		&track.ReplayGainAlbum,
 		&track.CreatedAt,

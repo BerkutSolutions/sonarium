@@ -2,7 +2,9 @@
 
 Base path: `/api`
 
-All responses use JSON envelope:
+Most `/api/*` endpoints require an authenticated session unless explicitly noted otherwise.
+
+All successful responses use a JSON envelope:
 
 ```json
 {
@@ -10,7 +12,7 @@ All responses use JSON envelope:
 }
 ```
 
-Errors use platform error envelope:
+Errors use the platform error envelope:
 
 ```json
 {
@@ -23,32 +25,51 @@ Errors use platform error envelope:
 
 ## Query Parameters
 
-List endpoints support:
+List endpoints commonly support:
 - `limit` (integer, optional)
 - `offset` (integer, optional)
 - `sort` (module-specific, optional)
+
+## Auth
+
+Public endpoints:
+- `GET /api/auth/status`
+- `POST /api/auth/login`
+- `POST /api/auth/register`
+
+Authenticated endpoints:
+- `POST /api/auth/logout`
+- `GET /api/auth/users`
+- `POST /api/auth/users/{user_id}/active`
+- `POST /api/auth/users/{user_id}/delete`
+- `POST /api/auth/settings/registration`
+- `GET /api/auth/users/lookup`
+- `GET /api/auth/profile/{user_id}`
+- `POST /api/auth/profile/update`
+- `POST /api/auth/profile/password`
 
 ## Artists
 
 - `GET /api/artists`
   - sort: `name`, `created_at`
 - `GET /api/artists/{id}`
+- `GET /api/artists/{id}/albums`
+  - sort: `name`, `year`, `created_at`
 
 ## Albums
 
 - `GET /api/albums`
   - sort: `name`, `year`, `created_at`
 - `GET /api/albums/{id}`
-- `GET /api/artists/{id}/albums`
-  - sort: `name`, `year`, `created_at`
+- `GET /api/albums/{id}/tracks`
+  - sort: `name`, `created_at`
 
 ## Tracks
 
 - `GET /api/tracks`
   - sort: `name`, `created_at`
 - `GET /api/tracks/{id}`
-- `GET /api/albums/{id}/tracks`
-  - sort: `name`, `created_at`
+- `GET /api/tracks/{id}/waveform`
 
 ## Playlists
 
@@ -63,6 +84,9 @@ List endpoints support:
     "name": "My Playlist"
   }
   ```
+- `POST /api/playlists/{id}/rename`
+- `POST /api/playlists/{id}/update`
+- `DELETE /api/playlists/{id}`
 - `POST /api/playlists/{id}/tracks`
   - body:
   ```json
@@ -89,11 +113,19 @@ List endpoints support:
   }
   ```
 
+## Sharing
+
+- `GET /api/shares/received`
+- `GET /api/shares/{entity_type}/{entity_id}`
+- `POST /api/shares/{entity_type}/{entity_id}/users`
+- `POST /api/shares/{entity_type}/{entity_id}/public`
+- `DELETE /api/shares/{share_id}`
+
 ## Streaming
 
 - `GET /api/stream/{track_id}`
   - supports HTTP range requests
-  - supports optional transcoding query:
+  - supports optional transcoding query params:
   - `format=opus|aac|mp3`
   - `bitrate=96|128|192|320`
 
@@ -101,39 +133,64 @@ List endpoints support:
 
 - `GET /api/covers/album/{album_id}`
   - returns original album cover image
-  - returns placeholder image when album has no cover
+  - returns placeholder image when the album has no cover
 - `GET /api/covers/artist/{artist_id}`
   - returns original artist cover image
-  - returns placeholder image when artist has no cover
+  - returns placeholder image when the artist has no cover
 - `GET /api/covers/album/{album_id}/thumb/{size}`
   - supported sizes: `64`, `128`, `256`
-  - returns cached/generated thumbnail
+  - returns cached or generated thumbnail
 
-## Smart Library
+## Library
 
 - `GET /api/library/home?limit=12`
-  - returns:
-  - `recent_albums`
-  - `recent_tracks`
-  - `continue_listening`
-  - `random_albums`
-  - `favorites` (`albums`, `artists`, `tracks`)
+  - returns `recent_albums`, `recent_tracks`, `continue_listening`, `random_albums`, `favorites`
 - `GET /api/library/random-albums?limit=12`
+- `GET /api/library/artist-album-counts`
+- `POST /api/library/scan`
+- `GET /api/library/scan/status`
+- `POST /api/library/upload`
 - `POST /api/library/favorites/tracks/{track_id}/toggle`
 - `POST /api/library/favorites/albums/{album_id}/toggle`
 - `POST /api/library/favorites/artists/{artist_id}/toggle`
+- `POST /api/library/artists/{artist_id}/update`
+- `POST /api/library/artists/{artist_id}/cover`
+- `POST /api/library/artists/{artist_id}/delete`
+- `POST /api/library/tracks/{track_id}/delete`
+- `POST /api/library/tracks/{track_id}/rename`
+- `POST /api/library/tracks/{track_id}/update`
+- `POST /api/library/albums/{album_id}/delete`
+- `POST /api/library/albums/{album_id}/rename`
+- `POST /api/library/albums/{album_id}/update`
+- `POST /api/library/albums/{album_id}/merge`
+- `POST /api/library/albums/create`
+
+## Settings
+
+- `GET /api/settings`
+- `POST /api/settings/updates/check`
+- `POST /api/settings/updates/auto`
+- `GET /api/settings/storage`
+- `POST /api/settings/library/delete-all`
+- `POST /api/settings/upload-concurrency`
 
 ## Smart Player
 
 - `GET /api/player/state`
-  - returns current playback session state
 - `POST /api/player/state`
-  - replace playback state snapshot
 - `POST /api/player/queue/replace`
   - body:
   ```json
   {
-    "queue": [{"track_id":"...","title":"...","artist":"...","duration":180,"cover_ref":"album_id"}],
+    "queue": [
+      {
+        "track_id": "...",
+        "title": "...",
+        "artist": "...",
+        "duration": 180,
+        "cover_ref": "album_id"
+      }
+    ],
     "queue_position": 0,
     "context_type": "album",
     "context_id": "album_uuid"
@@ -159,26 +216,13 @@ List endpoints support:
   }
   ```
 
-## Waveform
-
-- `GET /api/tracks/{id}/waveform`
-  - returns:
-  ```json
-  {
-    "data": {
-      "track_id": "uuid",
-      "amplitude": [0, 12, 18, 9, ...]
-    }
-  }
-  ```
-
 ## Subsonic Compatibility Layer
 
 Base path: `/rest`
 
 Supported formats:
 - `f=json`
-- `f=xml` (adapter supports XML output path)
+- `f=xml`
 
 Required protocol parameters:
 - `u` (username)
@@ -203,6 +247,6 @@ Supported endpoints:
 - `GET /rest/stream.view?id=...`
 
 Notes:
-- Subsonic layer is adapter-only and maps to internal services.
-- `stream.view` uses the existing streaming service (no separate stream engine).
-- `getCoverArt.view` uses the shared cover art service/cache (no dedicated Subsonic cover store).
+- Subsonic is an adapter layer over internal services.
+- `stream.view` uses the same streaming service as `/api/stream/{track_id}`.
+- `getCoverArt.view` uses the shared cover cache and placeholder logic.

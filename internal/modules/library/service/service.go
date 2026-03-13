@@ -43,6 +43,8 @@ type ScanService struct {
 	artistCacheByName map[string]domain.Artist
 	albumCacheByKey   map[string]domain.Album
 	cacheMu           sync.RWMutex
+	aggregateRefreshMu        sync.Mutex
+	aggregateRefreshScheduled bool
 }
 
 type scanJob struct {
@@ -87,6 +89,13 @@ func NewScanService(
 		artistCacheByName: make(map[string]domain.Artist),
 		albumCacheByKey:   make(map[string]domain.Album),
 	}
+}
+
+func (s *ScanService) ResetCaches() {
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+	s.artistCacheByName = make(map[string]domain.Artist)
+	s.albumCacheByKey = make(map[string]domain.Album)
 }
 
 func (s *ScanService) Scan(ctx context.Context) error {
@@ -172,7 +181,7 @@ func (s *ScanService) Scan(ctx context.Context) error {
 			result.metadata = fallbackMetadata(result.entry.Path)
 		}
 
-		if err := s.persistTrack(ctx, result.entry, result.metadata); err != nil {
+		if err := s.persistTrack(ctx, result.entry, result.metadata, ""); err != nil {
 			s.logger.Warn("persist track failed",
 				zap.String("file", result.entry.Path),
 				zap.Error(err),
@@ -213,7 +222,7 @@ func (s *ScanService) Scan(ctx context.Context) error {
 	return nil
 }
 
-func (s *ScanService) persistTrack(ctx context.Context, entry scanner.FileEntry, meta metadata.AudioMetadata) error {
+func (s *ScanService) persistTrack(ctx context.Context, entry scanner.FileEntry, meta metadata.AudioMetadata, uploadedByUserID string) error {
 	artistName := fallback(meta.Artist, "Unknown Artist")
 	albumTitle := fallback(meta.Album, "Unknown Album")
 	trackTitle := fallback(meta.Title, strings.TrimSuffix(filepath.Base(entry.Path), filepath.Ext(entry.Path)))
@@ -268,6 +277,8 @@ func (s *ScanService) persistTrack(ctx context.Context, entry scanner.FileEntry,
 		Genre:           strings.TrimSpace(meta.Genre),
 		Codec:           fallback(meta.Codec, strings.TrimPrefix(strings.ToLower(filepath.Ext(entry.Path)), ".")),
 		Bitrate:         fallbackBitrate(meta.Bitrate),
+		FileSizeBytes:   entry.Size,
+		UploadedByUserID: strings.TrimSpace(uploadedByUserID),
 		ReplayGainTrack: gains.Track,
 		ReplayGainAlbum: gains.Album,
 		CreatedAt:       time.Now().UTC(),
@@ -440,7 +451,7 @@ func fingerprintHash(file scanner.FileEntry) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func (s *ScanService) ScanUploadedFile(ctx context.Context, path string) error {
+func (s *ScanService) ScanUploadedFile(ctx context.Context, path, uploadedByUserID string) error {
 	info, err := os.Stat(path)
 	if err != nil {
 		return fmt.Errorf("stat uploaded file: %w", err)
@@ -456,7 +467,7 @@ func (s *ScanService) ScanUploadedFile(ctx context.Context, path string) error {
 		s.logger.Warn("metadata read failed for uploaded file", zap.String("file", entry.Path), zap.Error(err))
 		meta = fallbackMetadata(entry.Path)
 	}
-	if err := s.persistTrack(ctx, entry, meta); err != nil {
+	if err := s.persistTrack(ctx, entry, meta, uploadedByUserID); err != nil {
 		return fmt.Errorf("persist uploaded track: %w", err)
 	}
 	if err := s.fingerprintRepo.Upsert(ctx, entry.Path, entry.Size, entry.ModTime, fingerprintHash(entry)); err != nil {
@@ -466,9 +477,33 @@ func (s *ScanService) ScanUploadedFile(ctx context.Context, path string) error {
 		return fmt.Errorf("update last scan: %w", err)
 	}
 	if s.statsRepository != nil {
+		s.scheduleAggregateRefresh()
+	}
+	return nil
+}
+
+func (s *ScanService) scheduleAggregateRefresh() {
+	if s.statsRepository == nil {
+		return
+	}
+
+	s.aggregateRefreshMu.Lock()
+	if s.aggregateRefreshScheduled {
+		s.aggregateRefreshMu.Unlock()
+		return
+	}
+	s.aggregateRefreshScheduled = true
+	s.aggregateRefreshMu.Unlock()
+
+	go func() {
+		time.Sleep(2 * time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
 		if err := s.statsRepository.RefreshAggregates(ctx); err != nil {
 			s.logger.Warn("failed to refresh aggregates after upload", zap.Error(err))
 		}
-	}
-	return nil
+		s.aggregateRefreshMu.Lock()
+		s.aggregateRefreshScheduled = false
+		s.aggregateRefreshMu.Unlock()
+	}()
 }

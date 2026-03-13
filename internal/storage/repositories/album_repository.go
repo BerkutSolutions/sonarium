@@ -22,6 +22,11 @@ func (r *AlbumRepository) List(ctx context.Context) ([]domain.Album, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id, title, artist_id, year, cover_path, created_at, updated_at
 		FROM albums
+		WHERE EXISTS (
+			SELECT 1
+			FROM tracks t
+			WHERE t.album_id = albums.id
+		)
 		ORDER BY title ASC
 	`)
 	if err != nil {
@@ -80,7 +85,8 @@ func (r *AlbumRepository) GetByTitleAndArtistID(ctx context.Context, title, arti
 	err := r.db.QueryRowContext(ctx, `
 		SELECT id, title, artist_id, year, cover_path, created_at, updated_at
 		FROM albums
-		WHERE LOWER(title) = LOWER($1) AND artist_id = $2
+		WHERE LOWER(BTRIM(title)) = LOWER(BTRIM($1))
+		  AND artist_id = $2
 	`, title, artistID).Scan(
 		&album.ID,
 		&album.Title,
@@ -101,6 +107,11 @@ func (r *AlbumRepository) ListByArtistID(ctx context.Context, artistID string) (
 		SELECT id, title, artist_id, year, cover_path, created_at, updated_at
 		FROM albums
 		WHERE artist_id = $1
+		  AND EXISTS (
+			SELECT 1
+			FROM tracks t
+			WHERE t.album_id = albums.id
+		  )
 		ORDER BY year ASC, title ASC
 	`, artistID)
 	if err != nil {
@@ -137,6 +148,11 @@ func (r *AlbumRepository) Search(ctx context.Context, query string) ([]domain.Al
 		SELECT id, title, artist_id, year, cover_path, created_at, updated_at
 		FROM albums
 		WHERE title ILIKE '%' || $1 || '%'
+		  AND EXISTS (
+			SELECT 1
+			FROM tracks t
+			WHERE t.album_id = albums.id
+		  )
 		ORDER BY title ASC
 	`, query)
 	if err != nil {

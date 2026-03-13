@@ -8,7 +8,7 @@ Core goals:
 - single runtime service, modular internals
 - strict separation: domain logic vs transports (HTTP/Subsonic/UI)
 - Docker-first operation (Compose + Portainer)
-- persistence abstraction (SQLite default, PostgreSQL optional)
+- persistence abstraction around a PostgreSQL runtime backend
 - extension-ready for metadata providers, transcoding, multi-user, and external APIs
 
 ## 2. Architectural Style
@@ -33,7 +33,7 @@ Rule: transports call services; services call repository interfaces; infrastruct
 - **Subsonic Adapter**: compatibility endpoints mapped to internal services
 - **Streaming Handler**: range-aware file streaming with low-memory I/O
 - **Background Workers** (in same process): library scan, metadata refresh, cache warming
-- **Storage Adapters**: SQLite/PostgreSQL adapters, filesystem adapters, cache adapter
+- **Storage Adapters**: PostgreSQL adapter, filesystem adapters, cache adapter
 
 ## 4. Dependency Direction
 
@@ -63,15 +63,15 @@ Shared/common utilities must remain generic and live outside domain modules (for
 1. HTTP/Subsonic endpoint receives request
 2. Adapter validates transport-level input and maps into service command/query
 3. Service executes business logic and calls repository interfaces
-4. Repository implementation persists/loads data (SQLite or PostgreSQL)
+4. Repository implementation persists/loads data from PostgreSQL
 5. Response DTO returned via adapter
 
 Business rules never exist in handlers.
 
 ## 7. Persistence Strategy
 
-- Default: SQLite for easy self-hosted setups
-- Optional: PostgreSQL for larger installations
+- Runtime database: PostgreSQL
+- Repository abstraction is kept to preserve modularity and future backend flexibility
 - Repository pattern isolates SQL and storage concerns
 - Migrations are versioned and deterministic (startup migration step)
 
@@ -150,6 +150,11 @@ The project ships an embedded Web UI served by the Go backend itself:
   - `/tracks`
   - `/playlists`
   - `/search`
+  - `/library`
+  - `/settings`
+  - `/users`
+  - `/profile`
+- SPA fallback keeps deep links like `/genres`, `/profile/{id}` and entity detail pages routable through the same shell
 - local JS/CSS only, no CDN runtime dependencies
 
 Frontend architecture:

@@ -11,7 +11,7 @@
   <link rel="apple-touch-icon" href="/static/logo.png" />
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
-<body class="auth-locked">
+<body class="auth-pending">
   <div class="sh-app">
     <aside class="sh-sidebar">
       <div class="sh-brand">
@@ -47,6 +47,7 @@
             </svg>
           </button>
         </div>
+        <div id="sidebar-version" class="app-version" hidden>v1.0.1</div>
       </div>
     </aside>
 
@@ -62,7 +63,7 @@
 
   <footer id="player-root" class="sh-player-root"></footer>
 
-  <div id="auth-overlay">
+  <div id="auth-overlay" hidden>
     <div class="auth-card" id="auth-login-view">
       <div class="sh-auth-brand">
         <img src="/static/logo.png" alt="Sonarium" class="sh-auth-logo" />

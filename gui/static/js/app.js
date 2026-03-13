@@ -15,6 +15,7 @@ import { renderProfile } from './profile.js';
 import { renderAlbumDetail, renderArtistDetail, renderPlaylistDetail, renderTrackDetail } from './detail-pages.js';
 import { createAuthManager } from './auth.js';
 import { createShareModal } from './share-modal.js';
+import { API } from './api.js';
 
 async function init() {
   await initI18n(document.getElementById('lang-select'));
@@ -26,6 +27,7 @@ async function init() {
 
   const auth = createAuthManager();
   const authStatus = await auth.init();
+  const sidebarVersion = document.getElementById('sidebar-version');
   const playerRoot = document.getElementById('player-root');
   const playerHtml = await fetch('/static/player.html').then((res) => res.text());
   playerRoot.innerHTML = playerHtml;
@@ -62,6 +64,7 @@ async function init() {
   context.router = router;
 
   if (authStatus?.authenticated) {
+    await syncSidebarVersion(sidebarVersion);
     await router.start();
   }
 
@@ -78,8 +81,12 @@ async function init() {
       player.onAuthChanged(auth.getStatus?.());
     }
     if (auth.isAuthenticated()) {
+      await syncSidebarVersion(sidebarVersion);
       await router.start();
       return;
+    }
+    if (sidebarVersion) {
+      sidebarVersion.hidden = true;
     }
     document.getElementById('page-content').innerHTML = '';
   });
@@ -94,6 +101,22 @@ async function init() {
     if (!path || !auth.isAuthenticated()) return;
     await router.go(path);
   });
+}
+
+async function syncSidebarVersion(sidebarVersion) {
+  if (!sidebarVersion) return;
+  try {
+    const settings = await API.getSettings();
+    const version = String(settings?.version || '').trim();
+    if (!version) {
+      sidebarVersion.hidden = true;
+      return;
+    }
+    sidebarVersion.textContent = `v${version.replace(/^v/i, '')}`;
+    sidebarVersion.hidden = false;
+  } catch {
+    sidebarVersion.hidden = true;
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
