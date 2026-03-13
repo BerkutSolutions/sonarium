@@ -48,31 +48,34 @@ func NewRouter(
 	authService *authservice.Service,
 ) http.Handler {
 	r := chi.NewRouter()
+	defaultAPITimeout := 30 * time.Second
+	uploadTimeout := 10 * time.Minute
 
 	r.Use(RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(PanicRecovery(logger))
-	r.Use(middleware.Timeout(30 * time.Second))
 	r.Use(requestLogger(logger))
 
 	r.Get("/healthz", healthService.HealthzHandler)
 	r.Get("/readyz", healthService.ReadyzHandler)
 	r.Route("/api", func(api chi.Router) {
-		api.Get("/auth/status", authHandler.Status)
-		api.Post("/auth/login", authHandler.Login)
-		api.Post("/auth/register", authHandler.Register)
-		api.With(AuthRequired(authService)).Post("/auth/logout", authHandler.Logout)
-		api.With(AuthRequired(authService)).Get("/auth/users", authHandler.ListUsers)
-		api.With(AuthRequired(authService)).Post("/auth/users/{user_id}/active", authHandler.SetUserActive)
-		api.With(AuthRequired(authService)).Post("/auth/users/{user_id}/delete", authHandler.DeleteUser)
-		api.With(AuthRequired(authService)).Post("/auth/settings/registration", authHandler.SetRegistrationOpen)
-		api.With(AuthRequired(authService)).Get("/auth/users/lookup", authHandler.ListShareableUsers)
-		api.With(AuthRequired(authService)).Get("/auth/profile/{user_id}", authHandler.GetProfile)
-		api.With(AuthRequired(authService)).Post("/auth/profile/update", authHandler.UpdateProfile)
-		api.With(AuthRequired(authService)).Post("/auth/profile/password", authHandler.ChangePassword)
+		api.With(middleware.Timeout(defaultAPITimeout)).Get("/auth/status", authHandler.Status)
+		api.With(middleware.Timeout(defaultAPITimeout)).Post("/auth/login", authHandler.Login)
+		api.With(middleware.Timeout(defaultAPITimeout)).Post("/auth/register", authHandler.Register)
+		api.With(AuthRequired(authService), middleware.Timeout(defaultAPITimeout)).Post("/auth/logout", authHandler.Logout)
+		api.With(AuthRequired(authService), middleware.Timeout(defaultAPITimeout)).Get("/auth/users", authHandler.ListUsers)
+		api.With(AuthRequired(authService), middleware.Timeout(defaultAPITimeout)).Post("/auth/users/{user_id}/active", authHandler.SetUserActive)
+		api.With(AuthRequired(authService), middleware.Timeout(defaultAPITimeout)).Post("/auth/users/{user_id}/delete", authHandler.DeleteUser)
+		api.With(AuthRequired(authService), middleware.Timeout(defaultAPITimeout)).Post("/auth/settings/registration", authHandler.SetRegistrationOpen)
+		api.With(AuthRequired(authService), middleware.Timeout(defaultAPITimeout)).Get("/auth/users/lookup", authHandler.ListShareableUsers)
+		api.With(AuthRequired(authService), middleware.Timeout(defaultAPITimeout)).Get("/auth/profile/{user_id}", authHandler.GetProfile)
+		api.With(AuthRequired(authService), middleware.Timeout(defaultAPITimeout)).Post("/auth/profile/update", authHandler.UpdateProfile)
+		api.With(AuthRequired(authService), middleware.Timeout(defaultAPITimeout)).Post("/auth/profile/password", authHandler.ChangePassword)
+		api.With(AuthRequired(authService), middleware.Timeout(uploadTimeout)).Post("/library/upload", libraryHandler.Upload)
 
 		api.Group(func(api chi.Router) {
 			api.Use(AuthRequired(authService))
+			api.Use(middleware.Timeout(defaultAPITimeout))
 
 			api.Get("/stream/{track_id}", streamHandler.StreamTrack)
 
@@ -113,7 +116,6 @@ func NewRouter(
 			api.Get("/library/artist-album-counts", libraryHandler.ArtistAlbumCounts)
 			api.Post("/library/scan", libraryHandler.Scan)
 			api.Get("/library/scan/status", libraryHandler.ScanStatus)
-			api.Post("/library/upload", libraryHandler.Upload)
 			api.Post("/library/favorites/tracks/{track_id}/toggle", libraryHandler.ToggleFavoriteTrack)
 			api.Post("/library/favorites/albums/{album_id}/toggle", libraryHandler.ToggleFavoriteAlbum)
 			api.Post("/library/favorites/artists/{artist_id}/toggle", libraryHandler.ToggleFavoriteArtist)
