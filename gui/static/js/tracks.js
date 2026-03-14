@@ -88,8 +88,18 @@ export async function renderTracks(context, root) {
             danger: true,
             action: async () => {
               if (!track?.id) return;
-              await API.deleteTrack(track.id);
-              await loadData();
+              const prepared = context.player?.prepareTrackDeletion?.(track.id);
+              try {
+                await API.deleteTrack(track.id);
+                context.player?.handleTrackDeleted?.(track.id);
+                window.dispatchEvent(new CustomEvent('soundhub:library-updated'));
+                await loadData();
+              } catch (error) {
+                if (prepared) {
+                  context.player?.recoverPreparedTrackDeletion?.(track.id);
+                }
+                throw error;
+              }
             }
           }
         ]);

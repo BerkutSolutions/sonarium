@@ -8,9 +8,9 @@
 
 Sonarium is a self-hosted music platform for local libraries: streaming, smart player UX, collections, collaboration, and a built-in web interface with no SaaS dependency.
 
-Current version: `1.0.3`
+Current version: `1.0.4`
 
-## What's New In 1.0.3
+## What's New In 1.0.4
 
 - Collapsible sidebar with updated navigation icons.
 - Better upload flow in Library:
@@ -31,6 +31,8 @@ Current version: `1.0.3`
   - Click current track in player to open track page.
   - Fixed player UI state restoration after page reload.
   - Smoother progress behavior and visual alignment tweaks.
+- Sidebar usability:
+  - Sidebar can now collapse/expand by clicking the logo/brand area.
 
 ## Overview
 

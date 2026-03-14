@@ -358,8 +358,18 @@ export async function renderTrackDetail(context, root, params) {
     canShare: true,
     onEdit: () => setDetailEditing(root, true),
     deleteAction: async () => {
-      await API.deleteTrack(track.id);
-      await context.router.go('/tracks');
+      const prepared = context.player?.prepareTrackDeletion?.(track.id);
+      try {
+        await API.deleteTrack(track.id);
+        context.player?.handleTrackDeleted?.(track.id);
+        window.dispatchEvent(new CustomEvent('soundhub:library-updated'));
+        await context.router.go('/tracks');
+      } catch (error) {
+        if (prepared) {
+          context.player?.recoverPreparedTrackDeletion?.(track.id);
+        }
+        throw error;
+      }
     }
   });
   bindEditForm(root, async (form) => {
@@ -644,8 +654,18 @@ function buildTrackRowMenuItems(root, context, track, options = {}) {
       label: t('delete', 'Delete'),
       danger: true,
       action: async () => {
-        await API.deleteTrack(track.id);
-        await context.router.refresh();
+        const prepared = context.player?.prepareTrackDeletion?.(track.id);
+        try {
+          await API.deleteTrack(track.id);
+          context.player?.handleTrackDeleted?.(track.id);
+          window.dispatchEvent(new CustomEvent('soundhub:library-updated'));
+          await context.router.refresh();
+        } catch (error) {
+          if (prepared) {
+            context.player?.recoverPreparedTrackDeletion?.(track.id);
+          }
+          throw error;
+        }
       }
     },
     {

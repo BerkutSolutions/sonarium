@@ -18,6 +18,7 @@ import { createShareModal } from './share-modal.js';
 import { API } from './api.js';
 
 const SIDEBAR_COLLAPSED_KEY = 'sonarium.sidebar.collapsed';
+const MOBILE_SIDEBAR_MEDIA = '(max-width: 900px)';
 
 async function init() {
   await initI18n(document.getElementById('lang-select'));
@@ -31,7 +32,10 @@ async function init() {
   const authStatus = await auth.init();
   const sidebarVersion = document.getElementById('sidebar-version');
   const sidebarToggle = document.getElementById('sidebar-toggle');
-  initSidebarCollapse(sidebarToggle);
+  const sidebarBrand = document.querySelector('.sh-sidebar .sh-brand');
+  const mobileNavToggle = document.getElementById('mobile-nav-toggle');
+  const mobileSidebarBackdrop = document.getElementById('mobile-sidebar-backdrop');
+  initSidebarCollapse(sidebarToggle, sidebarBrand, mobileNavToggle, mobileSidebarBackdrop);
   const playerRoot = document.getElementById('player-root');
   const playerHtml = await fetch('/static/player.html').then((res) => res.text());
   playerRoot.innerHTML = playerHtml;
@@ -107,22 +111,61 @@ async function init() {
   });
 }
 
-function initSidebarCollapse(toggleButton) {
+function initSidebarCollapse(toggleButton, brand, mobileToggleButton, mobileBackdrop) {
   if (!toggleButton) return;
+  const mobileMedia = window.matchMedia(MOBILE_SIDEBAR_MEDIA);
+  const setMobileNav = (open) => {
+    document.body.classList.toggle('mobile-nav-open', open);
+    if (mobileBackdrop) {
+      mobileBackdrop.hidden = !open;
+    }
+    if (mobileToggleButton) {
+      mobileToggleButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+  };
+  const closeMobileNav = () => setMobileNav(false);
+  const toggleMobileNav = () => setMobileNav(!document.body.classList.contains('mobile-nav-open'));
+  const syncMobileMode = () => {
+    document.body.classList.toggle('mobile-layout', mobileMedia.matches);
+    if (!mobileMedia.matches) {
+      closeMobileNav();
+    }
+  };
   const apply = (collapsed) => {
     document.body.classList.toggle('sidebar-collapsed', collapsed);
     toggleButton.setAttribute('aria-label', collapsed ? t('sidebar_expand', 'Expand sidebar') : t('sidebar_collapse', 'Collapse sidebar'));
   };
-  const stored = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
-  apply(stored === '1');
-  toggleButton.addEventListener('click', () => {
+  const toggle = () => {
+    if (mobileMedia.matches) {
+      toggleMobileNav();
+      return;
+    }
     const next = !document.body.classList.contains('sidebar-collapsed');
     apply(next);
     window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0');
+  };
+  const stored = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+  apply(stored === '1');
+  syncMobileMode();
+  toggleButton.addEventListener('click', toggle);
+  mobileToggleButton?.addEventListener('click', toggleMobileNav);
+  mobileBackdrop?.addEventListener('click', closeMobileNav);
+  brand?.addEventListener('click', (event) => {
+    if (event.target.closest('#sidebar-toggle')) return;
+    toggle();
   });
+  document.getElementById('sidebar-nav')?.addEventListener('click', (event) => {
+    if (!mobileMedia.matches) return;
+    if (!event.target.closest('a[href]')) return;
+    closeMobileNav();
+  });
+  window.addEventListener('resize', syncMobileMode);
+  window.addEventListener('orientationchange', syncMobileMode);
+  mobileMedia.addEventListener?.('change', syncMobileMode);
   window.addEventListener('soundhub:lang-changed', () => {
     apply(document.body.classList.contains('sidebar-collapsed'));
   });
+  window.addEventListener('soundhub:navigate', closeMobileNav);
 }
 
 async function syncSidebarVersion(sidebarVersion) {

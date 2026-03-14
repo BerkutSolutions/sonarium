@@ -45,6 +45,8 @@ export class Player {
     this._progressAnchorTime = 0;
     this._progressAnchorPerf = 0;
     this._dragQueueIndex = -1;
+    this._preparedDeletion = null;
+    this._handlingMissingTrackID = '';
     this._queueOutsideClickHandler = (event) => {
       if (!this.queuePanel.classList.contains('open')) return;
       if (event.target.closest('#player-queue-panel')) return;
@@ -236,6 +238,79 @@ export class Player {
 
   setQueue(tracks, startIndex = 0) {
     this.replaceQueueFromTracks(tracks, startIndex, 'tracks', 'list', true);
+  }
+
+  isCurrentTrack(trackID) {
+    return String(this.queue.current()?.track_id || '').trim() === String(trackID || '').trim();
+  }
+
+  prepareTrackDeletion(trackID) {
+    const normalized = String(trackID || '').trim();
+    if (!normalized || !this.isCurrentTrack(normalized)) return false;
+    this._preparedDeletion = {
+      trackID: normalized,
+      queuePosition: this.queue.position,
+      currentTime: Math.max(0, Number(this.audio.currentTime || 0)),
+      wasPlaying: !this.audio.paused
+    };
+    this.audio.pause();
+    this.audio.removeAttribute('src');
+    this.audio.load();
+    this.isPlaying = false;
+    this._restoredCurrentTime = this._preparedDeletion.currentTime;
+    this._syncProgressAnchor(this._restoredCurrentTime);
+    this._stopProgressLoop();
+    this._renderControls();
+    return true;
+  }
+
+  recoverPreparedTrackDeletion(trackID) {
+    const normalized = String(trackID || '').trim();
+    if (!this._preparedDeletion || this._preparedDeletion.trackID !== normalized) return;
+    const snapshot = this._preparedDeletion;
+    this._preparedDeletion = null;
+    const index = this.queue.items.findIndex((item) => item.track_id === normalized);
+    if (index < 0) {
+      this._render();
+      return;
+    }
+    this.queue.position = index;
+    this._restoredCurrentTime = snapshot.currentTime;
+    this.playAt(index);
+    if (!snapshot.wasPlaying) {
+      this.audio.pause();
+    }
+  }
+
+  handleTrackDeleted(trackID) {
+    const normalized = String(trackID || '').trim();
+    if (!normalized) return;
+    if (this._preparedDeletion?.trackID === normalized) {
+      this._preparedDeletion = null;
+    }
+    const index = this.queue.items.findIndex((item) => item.track_id === normalized);
+    if (index < 0) return;
+    const wasCurrent = index === this.queue.position;
+    this.queue.remove(index);
+    this._pushQueueReplace();
+    if (!wasCurrent) {
+      this._render();
+      this._scheduleSync();
+      return;
+    }
+    this.audio.pause();
+    this.audio.removeAttribute('src');
+    this.audio.load();
+    this.isPlaying = false;
+    this._restoredCurrentTime = 0;
+    this._syncProgressAnchor(0);
+    const current = this.queue.current();
+    if (!current) {
+      this._render();
+      this._scheduleSync();
+      return;
+    }
+    this.playAt(this.queue.position);
   }
 
   playTrack(track) {
@@ -785,35 +860,14 @@ export class Player {
   }
 
   _handleMissingCurrentTrack(trackID) {
-    if (!trackID) return;
-    const index = this.queue.items.findIndex((item) => item.track_id === trackID);
-    if (index < 0) return;
-    const wasCurrent = index === this.queue.position;
-    this.queue.remove(index);
-    this.audio.pause();
-    this.audio.removeAttribute('src');
-    this.audio.load();
-    this._restoredCurrentTime = 0;
-
-    if (wasCurrent) {
-      const current = this.queue.current();
-      if (current) {
-        this.title.textContent = current.title || t('unknown_title', 'Unknown title');
-        this.artist.textContent = current.artist || t('unknown_artist', 'Unknown artist');
-        this.cover.src = current.cover_ref ? API.albumCoverThumbUrl(current.cover_ref, 256) : '/static/logo.png';
-        if (this._isAuthenticated()) {
-          this._resolveArtistName(current);
-          this._hydrateCurrentMetadata(current);
-        }
-      } else {
-        this.title.textContent = t('player_no_track', 'No track selected');
-        this.artist.textContent = '-';
-        this.cover.src = '/static/logo.png';
-      }
+    const normalized = String(trackID || '').trim();
+    if (!normalized || this._handlingMissingTrackID === normalized) return;
+    this._handlingMissingTrackID = normalized;
+    try {
+      this.handleTrackDeleted(normalized);
+    } finally {
+      this._handlingMissingTrackID = '';
     }
-
-    this._render();
-    this._scheduleSync();
   }
 
   _isAuthenticated() {
