@@ -83,7 +83,7 @@ func (c *UpdateChecker) Check(ctx context.Context, currentVersion string) (*Upda
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return c.LastResult(), err
+		return c.fallbackUnavailable(now, currentVersion), nil
 	}
 	defer resp.Body.Close()
 
@@ -99,23 +99,7 @@ func (c *UpdateChecker) Check(ctx context.Context, currentVersion string) (*Upda
 		}
 	} else {
 		c.setNextAllowedFromHeaders(resp.Header, now)
-		last := c.LastResult()
-		if last != nil {
-			return last, nil
-		}
-		fallback := &UpdateCheckResult{
-			CurrentVersion: currentVersion,
-			LatestVersion:  currentVersion,
-			ReleaseURL:     c.repository,
-			HasUpdate:      false,
-			CheckedAt:      now,
-			Source:         "github_unavailable",
-		}
-		c.mu.Lock()
-		c.cached = fallback
-		c.lastRequest = now
-		c.mu.Unlock()
-		return c.LastResult(), nil
+		return c.fallbackUnavailable(now, currentVersion), nil
 	}
 
 	latest := normalizeVersion(payload.TagName)
@@ -134,6 +118,29 @@ func (c *UpdateChecker) Check(ctx context.Context, currentVersion string) (*Upda
 	c.nextAllowed = now
 	c.mu.Unlock()
 	return c.LastResult(), nil
+}
+
+func (c *UpdateChecker) fallbackUnavailable(now time.Time, currentVersion string) *UpdateCheckResult {
+	last := c.LastResult()
+	if last != nil {
+		return last
+	}
+	fallback := &UpdateCheckResult{
+		CurrentVersion: currentVersion,
+		LatestVersion:  currentVersion,
+		ReleaseURL:     c.repository,
+		HasUpdate:      false,
+		CheckedAt:      now,
+		Source:         "github_unavailable",
+	}
+	c.mu.Lock()
+	c.cached = fallback
+	c.lastRequest = now
+	if c.nextAllowed.Before(now) {
+		c.nextAllowed = now.Add(15 * time.Minute)
+	}
+	c.mu.Unlock()
+	return c.LastResult()
 }
 
 func (c *UpdateChecker) setNextAllowedFromHeaders(headers http.Header, now time.Time) {

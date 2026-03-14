@@ -35,6 +35,12 @@ func (f *fakeTrackRepository) GetByID(context.Context, string) (domain.Track, er
 func (f *fakeTrackRepository) GetByFilePath(context.Context, string) (domain.Track, error) {
 	return domain.Track{}, sql.ErrNoRows
 }
+func (f *fakeTrackRepository) HasTitle(context.Context, string) (bool, error) {
+	return false, nil
+}
+func (f *fakeTrackRepository) HasIdentity(context.Context, string, string, string) (bool, error) {
+	return false, nil
+}
 func (f *fakeTrackRepository) ListByAlbumID(context.Context, string) ([]domain.Track, error) {
 	return nil, nil
 }

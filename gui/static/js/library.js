@@ -2,6 +2,8 @@ import { API } from './api.js';
 import { t } from './i18n.js';
 
 const UPLOAD_CONCURRENCY_KEY = 'sonarium.uploadConcurrency';
+const UPLOAD_HISTORY_KEY = 'sonarium.uploadHistory';
+const UPLOAD_HISTORY_LIMIT = 30;
 let uploadConcurrency = Math.min(10, Math.max(1, Number(window.localStorage.getItem(UPLOAD_CONCURRENCY_KEY) || 4)));
 
 window.addEventListener('soundhub:upload-concurrency-changed', (event) => {
@@ -28,6 +30,7 @@ const uploadManager = (() => {
       items: [],
       summary: '',
       uploaded: 0,
+      skipped: 0,
       total: 0,
       failed: 0,
       progressPercent: 0,
@@ -38,6 +41,7 @@ const uploadManager = (() => {
     if (!batch) return emptyState();
 
     const uploaded = batch.items.filter((item) => item.status === 'done').length;
+    const skipped = batch.items.filter((item) => item.status === 'skipped').length;
     const failed = batch.items.filter((item) => item.status === 'failed').length;
     const totalBytes = batch.items.reduce((sum, item) => sum + (item.total || 0), 0);
     const loadedBytes = batch.items.reduce((sum, item) => {
@@ -57,6 +61,9 @@ const uploadManager = (() => {
       if (failed > 0) {
         summary += ` | ${t('upload_failed_count', 'Failed')}: ${failed}`;
       }
+      if (skipped > 0) {
+        summary += ` | ${t('upload_skipped_count', 'Skipped')}: ${skipped}`;
+      }
     } else if (batch.cancelled) {
       summary = `${t('upload_cancelled', 'Upload cancelled')}: ${uploaded}/${batch.items.length}`;
       if (cancelledCount > 0) {
@@ -73,6 +80,7 @@ const uploadManager = (() => {
       items: batch.items,
       summary,
       uploaded,
+      skipped,
       total: batch.items.length,
       failed,
       progressPercent,
@@ -90,7 +98,7 @@ const uploadManager = (() => {
     return () => listeners.delete(listener);
   }
 
-  async function start(files) {
+  async function start(files, options = {}) {
     if (batch?.running) {
       abort();
     }
@@ -127,8 +135,9 @@ const uploadManager = (() => {
         notify();
 
         try {
-          await API.uploadLibraryFileWithProgress(item.file, {
+          const payload = await API.uploadLibraryFileWithProgress(item.file, {
             signal: controller.signal,
+            skipDuplicates: Boolean(options?.skipDuplicates),
             onProgress(progress) {
               item.loaded = progress.loaded;
               item.total = progress.total;
@@ -136,7 +145,7 @@ const uploadManager = (() => {
               notify();
             },
           });
-          item.status = 'done';
+          item.status = payload?.status === 'skipped' ? 'skipped' : 'done';
           item.progress = 100;
           item.loaded = item.total || item.loaded;
         } catch (error) {
@@ -163,7 +172,7 @@ const uploadManager = (() => {
     if (!batch.cancelled && finalState.failed === 0) {
       batch = null;
       notify();
-      return emptyState();
+      return finalState;
     }
     return finalState;
   }
@@ -198,6 +207,7 @@ export async function renderLibrary(_context, root) {
   const form = root.querySelector('#library-upload-form');
   const fileInput = root.querySelector('#library-upload-file');
   const folderInput = root.querySelector('#library-upload-folder');
+  const skipDuplicatesInput = root.querySelector('#library-upload-skip-duplicates');
   const selectedEl = root.querySelector('#library-upload-selected');
   const resultEl = root.querySelector('#library-upload-result');
   const dropzone = root.querySelector('#library-upload-dropzone');
@@ -206,6 +216,9 @@ export async function renderLibrary(_context, root) {
   const overallBarEl = root.querySelector('#library-upload-overall-bar');
   const listEl = root.querySelector('#library-upload-list');
   const cancelBtn = root.querySelector('#library-upload-cancel');
+  const historyListEl = root.querySelector('#library-upload-history-list');
+  const historyClearBtn = root.querySelector('#library-upload-history-clear');
+  let uploadHistory = loadUploadHistory();
   let unsubscribe = null;
 
   try {
@@ -250,7 +263,61 @@ export async function renderLibrary(_context, root) {
     cancelBtn.hidden = !state.running;
   }
 
+  function renderHistory() {
+    if (!historyListEl) return;
+    if (!uploadHistory.length) {
+      historyListEl.innerHTML = `<p class="sh-library-panel-copy">${escapeHtml(t('upload_history_empty', 'No upload history yet.'))}</p>`;
+      return;
+    }
+    historyListEl.innerHTML = uploadHistory.map((entry) => {
+      const items = (Array.isArray(entry.items) ? entry.items : []).map((item) => `
+        <div class="sh-upload-item" data-state="${escapeHtml(item.status)}">
+          <div class="sh-upload-item-head">
+            <strong title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</strong>
+            <span>${escapeHtml(renderUploadState(item))}</span>
+          </div>
+        </div>
+      `).join('');
+      return `
+        <article class="sh-library-upload-history-entry">
+          <header>
+            <strong>${escapeHtml(entry.summary || '')}</strong>
+            <span>${escapeHtml(formatHistoryTime(entry.at))}</span>
+          </header>
+          <div class="sh-library-upload-history-items">${items}</div>
+        </article>
+      `;
+    }).join('');
+  }
+
+  function appendHistory(state) {
+    const items = Array.isArray(state?.items) ? state.items : [];
+    if (!items.length) return;
+    const uploaded = items.filter((item) => item.status === 'done').length;
+    const skipped = items.filter((item) => item.status === 'skipped').length;
+    const failed = items.filter((item) => item.status === 'failed').length;
+    const cancelled = items.filter((item) => item.status === 'cancelled').length;
+    const total = items.length;
+    let summary = `${t('uploaded_count', 'Uploaded files')}: ${uploaded}/${total}`;
+    if (skipped > 0) summary += ` | ${t('upload_skipped_count', 'Skipped')}: ${skipped}`;
+    if (failed > 0) summary += ` | ${t('upload_failed_count', 'Failed')}: ${failed}`;
+    if (cancelled > 0) summary += ` | ${t('cancelled', 'Cancelled')}: ${cancelled}`;
+    uploadHistory.unshift({
+      at: Date.now(),
+      summary,
+      items: items.map((item) => ({
+        name: String(item.name || ''),
+        status: String(item.status || 'queued'),
+        error: String(item.error || ''),
+      })),
+    });
+    uploadHistory = uploadHistory.slice(0, UPLOAD_HISTORY_LIMIT);
+    saveUploadHistory(uploadHistory);
+    renderHistory();
+  }
+
   unsubscribe = uploadManager.subscribe(renderBatch);
+  renderHistory();
 
   scanBtn.addEventListener('click', async () => {
     scanBtn.disabled = true;
@@ -263,6 +330,11 @@ export async function renderLibrary(_context, root) {
   });
 
   cancelBtn?.addEventListener('click', () => uploadManager.abort());
+  historyClearBtn?.addEventListener('click', () => {
+    uploadHistory = [];
+    saveUploadHistory(uploadHistory);
+    renderHistory();
+  });
 
   form.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -272,12 +344,11 @@ export async function renderLibrary(_context, root) {
     const files = filterAudioFiles(Array.from(fileInput.files || []));
     if (!files.length) return;
     updateSelectedFiles(files);
-    const state = await uploadManager.start(files);
+    const state = await uploadManager.start(files, { skipDuplicates: Boolean(skipDuplicatesInput?.checked) });
     await reloadStatus();
     window.dispatchEvent(new CustomEvent('soundhub:library-updated'));
-    resultEl.textContent = state.cancelled
-      ? t('upload_cancelled', 'Upload cancelled')
-      : `${t('uploaded_count', 'Uploaded files')}: ${state.uploaded}/${state.total}`;
+    appendHistory(state);
+    resultEl.textContent = renderBatchResult(state);
     fileInput.value = '';
     updateSelectedFiles([]);
   });
@@ -286,12 +357,11 @@ export async function renderLibrary(_context, root) {
     const files = filterAudioFiles(Array.from(folderInput.files || []));
     if (!files.length) return;
     updateSelectedFiles(files);
-    const state = await uploadManager.start(files);
+    const state = await uploadManager.start(files, { skipDuplicates: Boolean(skipDuplicatesInput?.checked) });
     await reloadStatus();
     window.dispatchEvent(new CustomEvent('soundhub:library-updated'));
-    resultEl.textContent = state.cancelled
-      ? t('upload_cancelled', 'Upload cancelled')
-      : `${t('uploaded_count', 'Uploaded files')}: ${state.uploaded}/${state.total}`;
+    appendHistory(state);
+    resultEl.textContent = renderBatchResult(state);
     folderInput.value = '';
     updateSelectedFiles([]);
   });
@@ -311,12 +381,11 @@ export async function renderLibrary(_context, root) {
     const files = filterAudioFiles(await getDroppedAudioFiles(event));
     if (!files.length) return;
     updateSelectedFiles(files);
-    const state = await uploadManager.start(files);
+    const state = await uploadManager.start(files, { skipDuplicates: Boolean(skipDuplicatesInput?.checked) });
     await reloadStatus();
     window.dispatchEvent(new CustomEvent('soundhub:library-updated'));
-    resultEl.textContent = state.cancelled
-      ? t('upload_cancelled', 'Upload cancelled')
-      : `${t('uploaded_count', 'Uploaded files')}: ${state.uploaded}/${state.total}`;
+    appendHistory(state);
+    resultEl.textContent = renderBatchResult(state);
     updateSelectedFiles([]);
   });
 
@@ -340,10 +409,23 @@ export async function renderLibrary(_context, root) {
   await reloadStatus();
 }
 
+function renderBatchResult(state) {
+  if (state.cancelled) {
+    return t('upload_cancelled', 'Upload cancelled');
+  }
+  let result = `${t('uploaded_count', 'Uploaded files')}: ${state.uploaded}/${state.total}`;
+  if (state.skipped > 0) {
+    result += ` | ${t('upload_skipped_count', 'Skipped')}: ${state.skipped}`;
+  }
+  return result;
+}
+
 function renderUploadState(item) {
   switch (item.status) {
     case 'done':
       return t('uploaded', 'Uploaded');
+    case 'skipped':
+      return t('upload_skipped', 'Skipped duplicate');
     case 'failed':
       return `${t('upload_failed', 'Upload failed')}${item.error ? `: ${item.error}` : ''}`;
     case 'cancelled':
@@ -353,6 +435,28 @@ function renderUploadState(item) {
     default:
       return t('queued', 'Queued');
   }
+}
+
+function loadUploadHistory() {
+  try {
+    const raw = window.localStorage.getItem(UPLOAD_HISTORY_KEY);
+    const parsed = JSON.parse(raw || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveUploadHistory(history) {
+  try {
+    window.localStorage.setItem(UPLOAD_HISTORY_KEY, JSON.stringify(Array.isArray(history) ? history : []));
+  } catch {}
+}
+
+function formatHistoryTime(value) {
+  const ts = Number(value || 0);
+  if (!Number.isFinite(ts) || ts <= 0) return '';
+  return new Date(ts).toLocaleString('ru-RU');
 }
 
 function mapScannerStatus(status) {

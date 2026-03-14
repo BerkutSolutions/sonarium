@@ -8,7 +8,29 @@
 
 Sonarium is a self-hosted music platform for local libraries: streaming, smart player UX, collections, collaboration, and a built-in web interface with no SaaS dependency.
 
-Current version: `1.0.2`
+Current version: `1.0.3`
+
+## What's New In 1.0.3
+
+- Collapsible sidebar with updated navigation icons.
+- Better upload flow in Library:
+  - `Do not upload duplicates` option (enabled by default).
+  - Duplicate detection by title and metadata identity (`title + artist + genre`).
+  - Upload history with saved results (`uploaded / skipped / failed`).
+- Improved albums merge UX:
+  - Searchable merge target.
+  - Alphabetically sorted fallback dropdown when search is empty.
+- Added sort controls on key pages:
+  - Albums
+  - Artists
+  - Tracks
+- Home "Wave" updates:
+  - Genre selector under the play button.
+  - If genre is not selected, Wave plays all tracks.
+- Player improvements:
+  - Click current track in player to open track page.
+  - Fixed player UI state restoration after page reload.
+  - Smoother progress behavior and visual alignment tweaks.
 
 ## Overview
 

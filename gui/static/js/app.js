@@ -1,6 +1,6 @@
 import { createRouter } from './router.js';
 import { Player } from './player.js';
-import { initI18n } from './i18n.js';
+import { initI18n, t } from './i18n.js';
 import { renderHome } from './home.js';
 import { renderArtists } from './artists.js';
 import { renderAlbums } from './albums.js';
@@ -17,6 +17,8 @@ import { createAuthManager } from './auth.js';
 import { createShareModal } from './share-modal.js';
 import { API } from './api.js';
 
+const SIDEBAR_COLLAPSED_KEY = 'sonarium.sidebar.collapsed';
+
 async function init() {
   await initI18n(document.getElementById('lang-select'));
   const langSelect = document.getElementById('lang-select');
@@ -28,6 +30,8 @@ async function init() {
   const auth = createAuthManager();
   const authStatus = await auth.init();
   const sidebarVersion = document.getElementById('sidebar-version');
+  const sidebarToggle = document.getElementById('sidebar-toggle');
+  initSidebarCollapse(sidebarToggle);
   const playerRoot = document.getElementById('player-root');
   const playerHtml = await fetch('/static/player.html').then((res) => res.text());
   playerRoot.innerHTML = playerHtml;
@@ -100,6 +104,24 @@ async function init() {
     const path = event?.detail?.path;
     if (!path || !auth.isAuthenticated()) return;
     await router.go(path);
+  });
+}
+
+function initSidebarCollapse(toggleButton) {
+  if (!toggleButton) return;
+  const apply = (collapsed) => {
+    document.body.classList.toggle('sidebar-collapsed', collapsed);
+    toggleButton.setAttribute('aria-label', collapsed ? t('sidebar_expand', 'Expand sidebar') : t('sidebar_collapse', 'Collapse sidebar'));
+  };
+  const stored = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+  apply(stored === '1');
+  toggleButton.addEventListener('click', () => {
+    const next = !document.body.classList.contains('sidebar-collapsed');
+    apply(next);
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0');
+  });
+  window.addEventListener('soundhub:lang-changed', () => {
+    apply(document.body.classList.contains('sidebar-collapsed'));
   });
 }
 

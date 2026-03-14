@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -42,7 +43,7 @@ type Management interface {
 	LibraryPath() string
 	ScanStatus() libraryservice.ScanState
 	TriggerScan() bool
-	SaveUpload(ctx context.Context, userID, fileName string, src io.Reader) (string, error)
+	SaveUpload(ctx context.Context, userID, fileName string, src io.Reader, skipDuplicates bool) (string, error)
 	Settings(ctx context.Context) libraryservice.SettingsInfo
 	CheckUpdates(ctx context.Context) (*appmeta.UpdateCheckResult, error)
 	StorageUsage(ctx context.Context) (libraryrepo.StorageUsage, error)
@@ -205,8 +206,16 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	path, err := h.management.SaveUpload(r.Context(), currentUserID(r.Context()), header.Filename, file)
+	skipDuplicates := strings.EqualFold(strings.TrimSpace(r.FormValue("skip_duplicates")), "true")
+	path, err := h.management.SaveUpload(r.Context(), currentUserID(r.Context()), header.Filename, file, skipDuplicates)
 	if err != nil {
+		if errors.Is(err, libraryservice.ErrDuplicateUpload) {
+			response.WriteOK(w, map[string]any{"data": map[string]any{
+				"stored_path": "",
+				"status":      "skipped",
+			}})
+			return
+		}
 		response.WriteError(w, apperrors.NewBadRequest(err.Error()))
 		return
 	}

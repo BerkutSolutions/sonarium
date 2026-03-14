@@ -14797,6 +14797,7 @@ body.sh-modal-open {
   inset: 0;
   overflow: hidden;
   filter: saturate(1.15);
+  pointer-events: none;
 }
 
 .sh-home-wave-blob,
@@ -14849,6 +14850,16 @@ body.sh-modal-open {
     radial-gradient(circle at center, rgba(48, 98, 255, 0.14), rgba(48, 98, 255, 0) 74%);
   filter: blur(34px);
   animation: shWaveGlow 14s infinite;
+}
+
+.sh-home-wave-controls {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
 }
 
 .sh-home-wave-btn {
@@ -15061,4 +15072,280 @@ body.sh-modal-open {
   max-height: min(42vh, 360px);
   overflow: auto;
   padding-right: 4px;
+}
+
+/* v1.0.3 sidebar collapse + nav icons + upload option + player centering */
+.sh-brand {
+  position: relative !important;
+}
+
+.sidebar-toggle {
+  margin-left: auto !important;
+  flex: 0 0 auto !important;
+}
+
+.sh-nav a {
+  gap: 10px !important;
+  white-space: nowrap !important;
+}
+
+.sh-nav-icon {
+  width: 18px !important;
+  height: 18px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 18px !important;
+  opacity: 0.9 !important;
+}
+
+.sh-nav-icon svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.sh-nav-label {
+  min-width: 0 !important;
+}
+
+.sh-library-upload-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 6px;
+  color: rgba(230, 236, 255, 0.84);
+  font-size: 13px;
+}
+
+.sh-library-upload-option input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+}
+
+.sh-player-controls {
+  margin-left: -10px !important;
+}
+
+body.sidebar-collapsed .sh-app {
+  grid-template-columns: 76px 1fr !important;
+}
+
+body.sidebar-collapsed .sh-player-root {
+  left: 76px !important;
+}
+
+body.sidebar-collapsed .sh-sidebar {
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+body.sidebar-collapsed .sh-brand-text,
+body.sidebar-collapsed .sh-nav-label,
+body.sidebar-collapsed #sidebar-version {
+  display: none !important;
+}
+
+body.sidebar-collapsed .sh-brand {
+  justify-content: center !important;
+  gap: 0 !important;
+}
+
+body.sidebar-collapsed .sidebar-toggle {
+  position: absolute !important;
+  top: 2px !important;
+  right: 0 !important;
+  width: 26px !important;
+  height: 26px !important;
+  min-width: 26px !important;
+  opacity: 0.85 !important;
+}
+
+body.sidebar-collapsed .sidebar-toggle svg {
+  transform: rotate(180deg);
+}
+
+body.sidebar-collapsed .sh-nav a {
+  justify-content: center !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+  gap: 0 !important;
+}
+
+body.sidebar-collapsed .sidebar-tools {
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+body.sidebar-collapsed .sidebar-lang-select {
+  width: 52px !important;
+  min-width: 52px !important;
+  max-width: 52px !important;
+  padding-left: 8px !important;
+  padding-right: 20px !important;
+  font-size: 11px !important;
+}
+
+@media (max-width: 1100px) {
+  body.sidebar-collapsed .sh-player-root {
+    left: 0 !important;
+  }
+}
+
+.sh-list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 14px;
+}
+
+.sh-list-sort-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sh-list-sort-field span {
+  font-size: 13px;
+  color: rgba(224, 231, 255, 0.78);
+}
+
+.sh-list-sort-field select {
+  min-width: 170px;
+}
+
+.sh-tracks-toolbar {
+  flex-wrap: wrap;
+}
+
+.sh-home-wave-genre-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(231, 237, 255, 0.86);
+  font-size: 13px;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.sh-home-wave-genre-field select {
+  min-width: 190px;
+}
+
+#album-merge-target-search {
+  margin-bottom: 8px;
+}
+
+.sh-player-meta.is-clickable {
+  cursor: pointer;
+}
+
+.sh-player-meta.is-clickable:hover .sh-player-title {
+  text-decoration: underline;
+}
+
+/* player width balance tweak */
+@media (min-width: 1101px) {
+  .sh-player-root {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+}
+
+/* sidebar toggle fix: no overlap + same size in collapsed/expanded */
+.sidebar-toggle {
+  width: 26px !important;
+  height: 26px !important;
+  min-width: 26px !important;
+  min-height: 26px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+body.sidebar-collapsed .sh-brand {
+  justify-content: space-between !important;
+  gap: 8px !important;
+}
+
+body.sidebar-collapsed .sidebar-toggle {
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
+  opacity: 0.85 !important;
+}
+
+/* keep collapse button fully inside collapsed sidebar */
+body.sidebar-collapsed .sh-sidebar {
+  padding-left: 6px !important;
+  padding-right: 6px !important;
+  overflow: hidden !important;
+}
+
+body.sidebar-collapsed .sh-brand {
+  justify-content: flex-start !important;
+  gap: 6px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  padding-right: 2px !important;
+}
+
+body.sidebar-collapsed .sidebar-toggle {
+  margin-left: auto !important;
+  flex: 0 0 26px !important;
+  margin-right: 2px !important;
+}
+
+.sh-library-upload-history {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(96, 121, 187, 0.2);
+}
+
+.sh-library-upload-history-list {
+  display: grid;
+  gap: 10px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.sh-library-upload-history-entry {
+  border: 1px solid rgba(88, 111, 178, 0.2);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.sh-library-upload-history-entry > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.sh-library-upload-history-entry > header strong {
+  font-size: 13px;
+}
+
+.sh-library-upload-history-entry > header span {
+  font-size: 12px;
+  color: rgba(230, 236, 255, 0.7);
+  white-space: nowrap;
+}
+
+.sh-library-upload-history-items {
+  display: grid;
+  gap: 8px;
+}
+
+/* widen collapsed sidebar to keep toggle fully inside */
+body.sidebar-collapsed .sh-app {
+  grid-template-columns: 84px 1fr !important;
+}
+
+body.sidebar-collapsed .sh-player-root {
+  left: 84px !important;
 }

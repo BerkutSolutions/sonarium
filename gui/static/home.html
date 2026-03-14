@@ -7,7 +7,15 @@
       <span class="sh-home-wave-blob sh-home-wave-blob-c"></span>
       <span class="sh-home-wave-glow"></span>
     </div>
-    <button id="home-wave-btn" type="button" class="sh-home-wave-btn" data-i18n="play">Play</button>
+    <div class="sh-home-wave-controls">
+      <button id="home-wave-btn" type="button" class="sh-home-wave-btn" data-i18n="play">Play</button>
+      <label class="sh-home-wave-genre-field">
+        <span data-i18n="genre">Genre</span>
+        <select id="home-wave-genre">
+          <option value="" data-i18n="all_genres">All genres</option>
+        </select>
+      </label>
+    </div>
   </section>
   <div id="home-blocks" class="sh-home-blocks"></div>
 </section>

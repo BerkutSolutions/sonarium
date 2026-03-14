@@ -27,25 +27,27 @@ import (
 )
 
 type ScanService struct {
-	cfg               config.Config
-	logger            *zap.Logger
-	scanner           *scanner.FilesystemScanner
-	metadataReader    *metadata.Reader
-	artistRepository  domain.ArtistRepository
-	albumRepository   domain.AlbumRepository
-	trackRepository   domain.TrackRepository
-	libraryRepository domain.LibraryRepository
-	fingerprintRepo   *repositories.FileFingerprintRepository
-	coverService      *coverservice.Service
-	loudnessService   *loudnessservice.Service
-	waveformService   *waveformservice.Service
-	statsRepository   *libraryrepo.Repository
-	artistCacheByName map[string]domain.Artist
-	albumCacheByKey   map[string]domain.Album
-	cacheMu           sync.RWMutex
+	cfg                       config.Config
+	logger                    *zap.Logger
+	scanner                   *scanner.FilesystemScanner
+	metadataReader            *metadata.Reader
+	artistRepository          domain.ArtistRepository
+	albumRepository           domain.AlbumRepository
+	trackRepository           domain.TrackRepository
+	libraryRepository         domain.LibraryRepository
+	fingerprintRepo           *repositories.FileFingerprintRepository
+	coverService              *coverservice.Service
+	loudnessService           *loudnessservice.Service
+	waveformService           *waveformservice.Service
+	statsRepository           *libraryrepo.Repository
+	artistCacheByName         map[string]domain.Artist
+	albumCacheByKey           map[string]domain.Album
+	cacheMu                   sync.RWMutex
 	aggregateRefreshMu        sync.Mutex
 	aggregateRefreshScheduled bool
 }
+
+var ErrDuplicateUpload = errors.New("duplicate track")
 
 type scanJob struct {
 	entry scanner.FileEntry
@@ -268,21 +270,21 @@ func (s *ScanService) persistTrack(ctx context.Context, entry scanner.FileEntry,
 	}
 
 	track := domain.Track{
-		Title:           trackTitle,
-		AlbumID:         album.ID,
-		ArtistID:        artist.ID,
-		TrackNumber:     fallbackTrackNumber(meta.TrackNumber),
-		Duration:        meta.Duration,
-		FilePath:        entry.Path,
-		Genre:           strings.TrimSpace(meta.Genre),
-		Codec:           fallback(meta.Codec, strings.TrimPrefix(strings.ToLower(filepath.Ext(entry.Path)), ".")),
-		Bitrate:         fallbackBitrate(meta.Bitrate),
-		FileSizeBytes:   entry.Size,
+		Title:            trackTitle,
+		AlbumID:          album.ID,
+		ArtistID:         artist.ID,
+		TrackNumber:      fallbackTrackNumber(meta.TrackNumber),
+		Duration:         meta.Duration,
+		FilePath:         entry.Path,
+		Genre:            strings.TrimSpace(meta.Genre),
+		Codec:            fallback(meta.Codec, strings.TrimPrefix(strings.ToLower(filepath.Ext(entry.Path)), ".")),
+		Bitrate:          fallbackBitrate(meta.Bitrate),
+		FileSizeBytes:    entry.Size,
 		UploadedByUserID: strings.TrimSpace(uploadedByUserID),
-		ReplayGainTrack: gains.Track,
-		ReplayGainAlbum: gains.Album,
-		CreatedAt:       time.Now().UTC(),
-		UpdatedAt:       time.Now().UTC(),
+		ReplayGainTrack:  gains.Track,
+		ReplayGainAlbum:  gains.Album,
+		CreatedAt:        time.Now().UTC(),
+		UpdatedAt:        time.Now().UTC(),
 	}
 	if existingTrack.ID != "" {
 		track.ID = existingTrack.ID
@@ -451,7 +453,7 @@ func fingerprintHash(file scanner.FileEntry) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func (s *ScanService) ScanUploadedFile(ctx context.Context, path, uploadedByUserID string) error {
+func (s *ScanService) ScanUploadedFile(ctx context.Context, path, uploadedByUserID string, skipDuplicates bool) error {
 	info, err := os.Stat(path)
 	if err != nil {
 		return fmt.Errorf("stat uploaded file: %w", err)
@@ -466,6 +468,25 @@ func (s *ScanService) ScanUploadedFile(ctx context.Context, path, uploadedByUser
 	if err != nil {
 		s.logger.Warn("metadata read failed for uploaded file", zap.String("file", entry.Path), zap.Error(err))
 		meta = fallbackMetadata(entry.Path)
+	}
+	if skipDuplicates {
+		title := fallback(meta.Title, strings.TrimSuffix(filepath.Base(entry.Path), filepath.Ext(entry.Path)))
+		artist := fallback(meta.Artist, "Unknown Artist")
+		genre := strings.TrimSpace(meta.Genre)
+		byTitle, err := s.trackRepository.HasTitle(ctx, title)
+		if err != nil {
+			return fmt.Errorf("check duplicate by title: %w", err)
+		}
+		if byTitle {
+			return ErrDuplicateUpload
+		}
+		byIdentity, err := s.trackRepository.HasIdentity(ctx, title, artist, genre)
+		if err != nil {
+			return fmt.Errorf("check duplicate by metadata: %w", err)
+		}
+		if byIdentity {
+			return ErrDuplicateUpload
+		}
 	}
 	if err := s.persistTrack(ctx, entry, meta, uploadedByUserID); err != nil {
 		return fmt.Errorf("persist uploaded track: %w", err)

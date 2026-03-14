@@ -1,5 +1,14 @@
 ﻿<link rel="stylesheet" href="/static/styles.css" />
 <section class="sh-section sh-page-shell sh-media-page">
+  <div class="sh-list-toolbar">
+    <label class="sh-list-sort-field">
+      <span data-i18n="sort_by">Sort by</span>
+      <select id="artists-sort">
+        <option value="name" data-i18n="sort_name">Name</option>
+        <option value="created_at" data-i18n="sort_uploaded">Upload date</option>
+      </select>
+    </label>
+  </div>
   <div id="artists-list" class="sh-grid"></div>
 </section>
 

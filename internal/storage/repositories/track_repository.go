@@ -91,6 +91,39 @@ func (r *TrackRepository) GetByFilePath(ctx context.Context, filePath string) (d
 	return track, nil
 }
 
+func (r *TrackRepository) HasTitle(ctx context.Context, title string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM tracks
+			WHERE LOWER(BTRIM(title)) = LOWER(BTRIM($1))
+		)
+	`, title).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("check track title duplicate: %w", err)
+	}
+	return exists, nil
+}
+
+func (r *TrackRepository) HasIdentity(ctx context.Context, title, artistName, genre string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM tracks t
+			INNER JOIN artists a ON a.id = t.artist_id
+			WHERE LOWER(BTRIM(t.title)) = LOWER(BTRIM($1))
+			  AND LOWER(BTRIM(a.name)) = LOWER(BTRIM($2))
+			  AND LOWER(BTRIM(COALESCE(t.genre, ''))) = LOWER(BTRIM($3))
+		)
+	`, title, artistName, genre).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("check track metadata duplicate: %w", err)
+	}
+	return exists, nil
+}
+
 func (r *TrackRepository) ListByAlbumID(ctx context.Context, albumID string) ([]domain.Track, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id, title, album_id, artist_id, track_number, duration_seconds, file_path, genre, codec, bitrate, file_size_bytes, COALESCE(uploaded_by_user_id, ''), replay_gain_track, replay_gain_album, created_at, updated_at

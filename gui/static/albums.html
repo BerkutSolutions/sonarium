@@ -1,5 +1,15 @@
 ﻿<link rel="stylesheet" href="/static/styles.css" />
 <section class="sh-section sh-page-shell sh-media-page">
+  <div class="sh-list-toolbar">
+    <label class="sh-list-sort-field">
+      <span data-i18n="sort_by">Sort by</span>
+      <select id="albums-sort">
+        <option value="name" data-i18n="sort_name">Name</option>
+        <option value="created_at" data-i18n="sort_uploaded">Upload date</option>
+        <option value="year" data-i18n="sort_year">Year</option>
+      </select>
+    </label>
+  </div>
   <div id="albums-list" class="sh-grid"></div>
 </section>
 
@@ -73,6 +83,15 @@
         </label>
         <label class="sh-detail-edit-field">
           <span data-i18n="merge_target_album">Merge into album</span>
+          <input
+            type="search"
+            id="album-merge-target-search"
+            list="album-merge-target-options"
+            data-i18n-placeholder="merge_target_search_placeholder"
+            placeholder="Search album or leave empty"
+            autocomplete="off"
+          />
+          <datalist id="album-merge-target-options"></datalist>
           <select id="album-merge-target" required></select>
         </label>
         <p class="sh-library-panel-copy" data-i18n="merge_album_hint">The selected target album stays the main album. Tracks will only be moved into it.</p>

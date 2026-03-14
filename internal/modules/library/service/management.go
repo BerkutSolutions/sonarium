@@ -120,7 +120,7 @@ func (s *ManagementService) runScan() {
 	s.state.CompletedAt = time.Now().UTC()
 }
 
-func (s *ManagementService) SaveUpload(ctx context.Context, userID, fileName string, src io.Reader) (string, error) {
+func (s *ManagementService) SaveUpload(ctx context.Context, userID, fileName string, src io.Reader, skipDuplicates bool) (string, error) {
 	ext := strings.ToLower(filepath.Ext(fileName))
 	switch ext {
 	case ".mp3", ".flac", ".ogg", ".m4a":
@@ -166,7 +166,12 @@ func (s *ManagementService) SaveUpload(ctx context.Context, userID, fileName str
 		return "", fmt.Errorf("copy upload: %w", err)
 	}
 
-	if err := s.scanSvc.ScanUploadedFile(ctx, target, userID); err != nil {
+	if err := s.scanSvc.ScanUploadedFile(ctx, target, userID, skipDuplicates); err != nil {
+		if errors.Is(err, ErrDuplicateUpload) {
+			_ = os.Remove(target)
+			s.completeUpload(nil)
+			return "", ErrDuplicateUpload
+		}
 		s.completeUpload(err)
 		return "", fmt.Errorf("index uploaded file: %w", err)
 	}

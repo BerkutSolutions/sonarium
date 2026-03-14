@@ -23,6 +23,8 @@ type TrackRepository interface {
 	List(ctx context.Context) ([]Track, error)
 	GetByID(ctx context.Context, id string) (Track, error)
 	GetByFilePath(ctx context.Context, filePath string) (Track, error)
+	HasTitle(ctx context.Context, title string) (bool, error)
+	HasIdentity(ctx context.Context, title, artistName, genre string) (bool, error)
 	ListByAlbumID(ctx context.Context, albumID string) ([]Track, error)
 	ListByArtistID(ctx context.Context, artistID string) ([]Track, error)
 	Search(ctx context.Context, query string) ([]Track, error)

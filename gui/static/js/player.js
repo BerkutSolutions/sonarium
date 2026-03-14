@@ -12,6 +12,7 @@ export class Player {
     this.cover = root.querySelector('#player-cover');
     this.title = root.querySelector('#player-title');
     this.artist = root.querySelector('#player-artist');
+    this.meta = root.querySelector('.sh-player-meta');
     this.surface = root.querySelector('.sh-player-surface');
     this.main = root.querySelector('.sh-player-main');
     this.progress = root.querySelector('#player-progress');
@@ -190,6 +191,10 @@ export class Player {
     });
 
     window.addEventListener('resize', () => this._renderProgress());
+    this.meta?.addEventListener('click', (event) => {
+      if (event.target.closest('button')) return;
+      this._navigateToCurrentTrack();
+    });
   }
 
   replaceQueueFromTracks(tracks, startIndex, contextType, contextID, autoplay = true) {
@@ -328,10 +333,19 @@ export class Player {
 
   _render() {
     const current = this.queue.current();
-    if (!current) {
+    if (current) {
+      this.title.textContent = current.title || t('unknown_title', 'Unknown title');
+      this.artist.textContent = current.artist || t('unknown_artist', 'Unknown artist');
+      this.cover.src = current.cover_ref ? API.albumCoverThumbUrl(current.cover_ref, 256) : '/static/logo.png';
+      this.cover.onerror = () => {
+        this.cover.src = '/static/logo.png';
+      };
+      this.meta?.classList.add('is-clickable');
+    } else {
       this.title.textContent = t('player_no_track', 'No track selected');
       this.artist.textContent = '-';
       this.cover.src = '/static/logo.png';
+      this.meta?.classList.remove('is-clickable');
     }
     this.volume.value = String(this.audio.volume || 1);
     this._setVolumeVisual(Number(this.audio.volume || 1));
@@ -804,6 +818,12 @@ export class Player {
 
   _isAuthenticated() {
     return typeof this.auth?.isAuthenticated === 'function' ? this.auth.isAuthenticated() : true;
+  }
+
+  _navigateToCurrentTrack() {
+    const trackId = String(this.queue.current()?.track_id || '').trim();
+    if (!trackId) return;
+    window.dispatchEvent(new CustomEvent('soundhub:navigate', { detail: { path: `/tracks/${encodeURIComponent(trackId)}` } }));
   }
 
   _startVisualizer() {

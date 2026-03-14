@@ -2,6 +2,15 @@
 <section class="sh-section sh-page-shell sh-media-page">
   <div class="sh-tracks-toolbar">
     <input id="tracks-search" type="search" class="sh-tracks-search" data-i18n-placeholder="tracks_search_placeholder" placeholder="Search tracks" />
+    <label class="sh-list-sort-field">
+      <span data-i18n="sort_by">Sort by</span>
+      <select id="tracks-sort">
+        <option value="name" data-i18n="sort_name">Name</option>
+        <option value="created_at" data-i18n="sort_uploaded">Upload date</option>
+        <option value="year" data-i18n="sort_year">Year</option>
+        <option value="duration" data-i18n="sort_duration">Duration</option>
+      </select>
+    </label>
     <label class="sh-tracks-duplicates-toggle">
       <input type="checkbox" id="tracks-duplicates-only" />
       <span data-i18n="tracks_duplicates_only">Show duplicates only</span>

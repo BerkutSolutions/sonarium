@@ -5,6 +5,7 @@ import { loadArtistNameMap, resolveArtistName } from './artist-map.js';
 
 export async function renderArtists(context, root) {
   const list = root.querySelector('#artists-list');
+  const sortSelect = root.querySelector('#artists-sort');
   const editModal = root.querySelector('#artist-edit-modal');
   const editForm = root.querySelector('#artist-edit-form');
   const editName = root.querySelector('#artist-edit-name');
@@ -25,17 +26,18 @@ export async function renderArtists(context, root) {
 
   let artists = [];
   let countMap = new Map();
+  let currentSort = String(sortSelect?.value || 'name').trim().toLowerCase() || 'name';
   let selected = null;
   let editingArtist = null;
   let editMode = false;
 
   async function load() {
     const [artistsRaw, countsRaw] = await Promise.all([
-      API.getArtists({ limit: 500, offset: 0, sort: 'name' }),
+      API.getArtists({ limit: 500, offset: 0, sort: toBackendArtistSort(currentSort) }),
       API.getArtistAlbumCounts(),
     ]);
     countMap = new Map((Array.isArray(countsRaw) ? countsRaw : []).map((item) => [item.artist_id || item.artistId, item.album_count || item.albumCount || 0]));
-    artists = normalizeArtists(artistsRaw);
+    artists = sortArtists(normalizeArtists(artistsRaw), currentSort);
     renderList();
   }
 
@@ -265,6 +267,11 @@ export async function renderArtists(context, root) {
     window.dispatchEvent(new CustomEvent('soundhub:library-updated'));
   });
 
+  sortSelect?.addEventListener('change', async () => {
+    currentSort = String(sortSelect.value || 'name').trim().toLowerCase() || 'name';
+    await load();
+  });
+
   await load();
 
   async function buildArtistQueue(artistID) {
@@ -287,8 +294,29 @@ export async function renderArtists(context, root) {
 function normalizeArtists(raw) {
   return (Array.isArray(raw) ? raw : []).map((item) => ({
     id: item.id || item.ID || '',
-    name: item.name || item.Name || t('unknown_artist', 'Unknown artist')
+    name: item.name || item.Name || t('unknown_artist', 'Unknown artist'),
+    createdAt: parseDateValue(item.created_at || item.createdAt || item.CreatedAt),
   }));
+}
+
+function sortArtists(items, sortBy) {
+  const out = items.slice();
+  if (String(sortBy || '').toLowerCase() === 'created_at') {
+    out.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+    return out;
+  }
+  out.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }));
+  return out;
+}
+
+function parseDateValue(value) {
+  if (!value) return 0;
+  const ts = Date.parse(String(value));
+  return Number.isFinite(ts) ? ts : 0;
+}
+
+function toBackendArtistSort(sortBy) {
+  return String(sortBy || '').toLowerCase() === 'created_at' ? 'created_at' : 'name';
 }
 
 function normalizeTracks(raw, artistMap) {

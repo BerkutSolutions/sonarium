@@ -5,6 +5,7 @@ import { showContextMenu } from './context-menu.js';
 
 export async function renderAlbums(context, root) {
   const list = root.querySelector('#albums-list');
+  const sortSelect = root.querySelector('#albums-sort');
   const modal = root.querySelector('#album-modal');
   const modalClose = root.querySelector('#album-modal-close');
   const modalCover = root.querySelector('#album-modal-cover');
@@ -31,15 +32,19 @@ export async function renderAlbums(context, root) {
   const mergeClose = root.querySelector('#album-merge-close');
   const mergeCancel = root.querySelector('#album-merge-cancel');
   const mergeSource = root.querySelector('#album-merge-source');
+  const mergeTargetSearch = root.querySelector('#album-merge-target-search');
+  const mergeTargetOptions = root.querySelector('#album-merge-target-options');
   const mergeTarget = root.querySelector('#album-merge-target');
 
   let albums = [];
   let allTracks = [];
   let artistMap = new Map();
+  let currentSort = String(sortSelect?.value || 'name').trim().toLowerCase() || 'name';
   let selectedAlbum = null;
   let selectedAlbumTracks = [];
   let editMode = false;
   let mergeSourceAlbum = null;
+  let mergeCandidates = [];
 
   const pendingAlbumID = String(window.__soundhubOpenAlbumId || '').trim();
   if (pendingAlbumID) {
@@ -48,12 +53,12 @@ export async function renderAlbums(context, root) {
 
   async function loadData() {
     const [response, artists, tracksRaw] = await Promise.all([
-      API.getAlbums({ limit: 500, offset: 0, sort: 'year' }),
+      API.getAlbums({ limit: 500, offset: 0, sort: toBackendAlbumSort(currentSort) }),
       loadArtistNameMap(),
       API.getTracks({ limit: 3000, offset: 0, sort: 'name' })
     ]);
     artistMap = artists;
-    albums = normalizeAlbums(response, artistMap);
+    albums = sortAlbums(normalizeAlbums(response, artistMap), currentSort);
     allTracks = normalizeTracks(tracksRaw, artistMap);
     renderList();
     if (pendingAlbumID) {
@@ -159,16 +164,24 @@ export async function renderAlbums(context, root) {
   function openMergeModal(album) {
     if (!album?.id || !mergeModal || !mergeSource || !mergeTarget) return;
     mergeSourceAlbum = album;
-    mergeSource.value = albumLabel(album);
-    const candidates = albums.filter((item) => item.id !== album.id);
-    mergeTarget.innerHTML = [
-      `<option value="">${escapeHtml(t('select_album', 'Select album'))}</option>`,
-      ...candidates.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(albumLabel(item))}</option>`)
-    ].join('');
-    mergeTarget.value = '';
+    mergeSource.value = mergeAlbumLabelText(album);
+    mergeCandidates = albums
+      .filter((item) => item.id !== album.id)
+      .slice()
+      .sort((a, b) => mergeAlbumLabelText(a).localeCompare(mergeAlbumLabelText(b), undefined, { sensitivity: 'base' }));
+    if (mergeTargetSearch) {
+      mergeTargetSearch.value = '';
+    }
+    renderMergeTargetOptions('');
     mergeModal.hidden = false;
     document.body.classList.add('sh-modal-open');
-    queueMicrotask(() => mergeTarget.focus());
+    queueMicrotask(() => {
+      if (mergeTargetSearch) {
+        mergeTargetSearch.focus();
+        return;
+      }
+      mergeTarget.focus();
+    });
   }
 
   function closeMergeModal() {
@@ -382,7 +395,7 @@ export async function renderAlbums(context, root) {
   mergeForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!mergeSourceAlbum?.id) return;
-    const targetAlbumId = String(mergeTarget?.value || '').trim();
+    const targetAlbumId = resolveMergeTargetValue();
     if (!targetAlbumId) return;
     await API.mergeAlbum(mergeSourceAlbum.id, targetAlbumId);
     closeMergeModal();
@@ -390,6 +403,48 @@ export async function renderAlbums(context, root) {
     await loadData();
     window.dispatchEvent(new CustomEvent('soundhub:library-updated'));
   });
+
+  sortSelect?.addEventListener('change', async () => {
+    currentSort = String(sortSelect.value || 'name').trim().toLowerCase() || 'name';
+    await loadData();
+  });
+
+  mergeTargetSearch?.addEventListener('input', () => {
+    renderMergeTargetOptions(mergeTargetSearch.value);
+  });
+  mergeTargetSearch?.addEventListener('search', () => {
+    renderMergeTargetOptions(mergeTargetSearch.value);
+  });
+
+  function renderMergeTargetOptions(query) {
+    if (!mergeTarget) return;
+    const normalized = String(query || '').trim().toLowerCase();
+    const visible = normalized
+      ? mergeCandidates.filter((item) => mergeAlbumLabelText(item).toLowerCase().includes(normalized))
+      : mergeCandidates;
+
+    mergeTarget.innerHTML = [
+      `<option value="">${escapeHtml(t('select_album', 'Select album'))}</option>`,
+      ...visible.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(mergeAlbumLabelText(item))}</option>`)
+    ].join('');
+    mergeTarget.value = visible[0]?.id || '';
+
+    if (mergeTargetOptions) {
+      mergeTargetOptions.innerHTML = visible
+        .slice(0, 100)
+        .map((item) => `<option value="${escapeHtml(mergeAlbumLabelText(item))}"></option>`)
+        .join('');
+    }
+  }
+
+  function resolveMergeTargetValue() {
+    const selected = String(mergeTarget?.value || '').trim();
+    if (selected) return selected;
+    const inputLabel = String(mergeTargetSearch?.value || '').trim().toLowerCase();
+    if (!inputLabel) return '';
+    const matched = mergeCandidates.find((item) => mergeAlbumLabelText(item).toLowerCase() === inputLabel);
+    return matched?.id || '';
+  }
 
   function setEditMode(enabled) {
     const next = Boolean(enabled);
@@ -421,6 +476,7 @@ function normalizeAlbums(response, artistMap) {
     year: Number(album.year || album.Year || 0) || 0,
     artistId: String(album.artistId || album.ArtistID || '').trim(),
     artist: artistMap.get(String(album.artistId || album.ArtistID || '').trim()) || '',
+    createdAt: parseDateValue(album.created_at || album.createdAt || album.CreatedAt),
   }));
 }
 
@@ -472,3 +528,53 @@ function albumLabel(album) {
   return year ? `${title} · ${artist} · ${year}` : `${title} · ${artist}`;
 }
 
+function mergeAlbumLabel(album) {
+  const title = String(album?.title || t('unnamed', 'Unnamed')).trim();
+  const artist = String(album?.artist || t('unknown_artist', 'Unknown artist')).trim();
+  const year = Number(album?.year || 0) || 0;
+  return year ? `${title} · ${artist} · ${year}` : `${title} · ${artist}`;
+}
+
+function mergeAlbumLabelText(album) {
+  const title = String(album?.title || t('unnamed', 'Unnamed')).trim();
+  const artist = String(album?.artist || t('unknown_artist', 'Unknown artist')).trim();
+  const year = Number(album?.year || 0) || 0;
+  return year ? `${title} · ${artist} · ${year}` : `${title} · ${artist}`;
+}
+
+function sortAlbums(items, sortBy) {
+  const out = items.slice();
+  switch (String(sortBy || 'name').toLowerCase()) {
+    case 'created_at':
+      out.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+      break;
+    case 'year':
+      out.sort((a, b) => {
+        const ay = Number(a.year || 0);
+        const by = Number(b.year || 0);
+        if (ay <= 0 && by > 0) return 1;
+        if (by <= 0 && ay > 0) return -1;
+        if (ay !== by) return by - ay;
+        return String(a.title || '').localeCompare(String(b.title || ''), undefined, { sensitivity: 'base' });
+      });
+      break;
+    default:
+      out.sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), undefined, { sensitivity: 'base' }));
+      break;
+  }
+  return out;
+}
+
+function parseDateValue(value) {
+  if (!value) return 0;
+  const ts = Date.parse(String(value));
+  return Number.isFinite(ts) ? ts : 0;
+}
+
+function toBackendAlbumSort(sortBy) {
+  const value = String(sortBy || '').toLowerCase();
+  if (value === 'year' || value === 'created_at') {
+    return value;
+  }
+  return 'name';
+}

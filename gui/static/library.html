@@ -49,6 +49,10 @@
         <input id="library-upload-folder" class="sh-library-upload-input" type="file" webkitdirectory directory multiple />
         <label for="library-upload-file" class="sh-library-upload-trigger" data-i18n="upload">Upload</label>
         <label for="library-upload-folder" class="sh-library-upload-trigger secondary" data-i18n="upload_folder">Upload folder</label>
+        <label class="sh-library-upload-option">
+          <input id="library-upload-skip-duplicates" type="checkbox" checked />
+          <span data-i18n="upload_skip_duplicates">Do not upload duplicates</span>
+        </label>
         <span id="library-upload-selected" class="sh-library-upload-selected" data-i18n="library_no_files_selected">No files selected</span>
       </form>
 
@@ -71,6 +75,15 @@
           <span id="library-upload-overall-bar"></span>
         </div>
         <div id="library-upload-list" class="sh-library-upload-list"></div>
+      </section>
+      <section id="library-upload-history" class="sh-library-upload-history">
+        <div class="sh-library-panel-head">
+          <div>
+            <h3 data-i18n="upload_history">Upload history</h3>
+          </div>
+          <button type="button" id="library-upload-history-clear" class="btn ghost" data-i18n="clear">Clear</button>
+        </div>
+        <div id="library-upload-history-list" class="sh-library-upload-history-list"></div>
       </section>
     </section>
   </div>

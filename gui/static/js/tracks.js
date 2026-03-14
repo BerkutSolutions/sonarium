@@ -6,6 +6,7 @@ import { showContextMenu } from './context-menu.js';
 export async function renderTracks(context, root) {
   const list = root.querySelector('#tracks-list');
   const searchInput = root.querySelector('#tracks-search');
+  const sortSelect = root.querySelector('#tracks-sort');
   const duplicatesOnlyToggle = root.querySelector('#tracks-duplicates-only');
 
   let tracks = [];
@@ -13,10 +14,11 @@ export async function renderTracks(context, root) {
   let artistMap = new Map();
   let searchTerm = '';
   let duplicatesOnly = false;
+  let currentSort = String(sortSelect?.value || 'name').trim().toLowerCase() || 'name';
 
   async function loadData() {
     const [tracksRaw, albumsRaw, artists] = await Promise.all([
-      API.getTracks({ limit: 500, offset: 0, sort: 'name' }),
+      API.getTracks({ limit: 5000, offset: 0, sort: toBackendTrackSort(currentSort) }),
       API.getAlbums({ limit: 500, offset: 0, sort: 'year' }),
       loadArtistNameMap(),
     ]);
@@ -31,13 +33,14 @@ export async function renderTracks(context, root) {
       searchTerm,
       duplicatesOnly
     });
+    const sortedTracks = sortTracks(visibleTracks, currentSort);
 
-    if (!visibleTracks.length) {
+    if (!sortedTracks.length) {
       list.innerHTML = `<p>${escapeHtml(t('empty_no_tracks', 'No tracks found.'))}</p>`;
       return;
     }
 
-    list.innerHTML = visibleTracks
+    list.innerHTML = sortedTracks
       .map((track, idx) => `
       <article class="sh-detail-track-row sh-track-page-row" data-track-index="${idx}" data-track-id="${escapeHtml(track.id)}">
         <span class="sh-detail-track-index-slot">
@@ -61,7 +64,7 @@ export async function renderTracks(context, root) {
         event.preventDefault();
         event.stopPropagation();
         const index = Number(btn.getAttribute('data-play-index'));
-        context.player.replaceQueueFromTracks(visibleTracks, index, 'tracks', 'list', true);
+        context.player.replaceQueueFromTracks(sortedTracks, index, 'tracks', 'list', true);
       });
     });
 
@@ -69,15 +72,15 @@ export async function renderTracks(context, root) {
       row.addEventListener('click', (event) => {
         if (event.target.closest('button')) return;
         const index = Number(row.getAttribute('data-track-index'));
-        const track = visibleTracks[index];
+        const track = sortedTracks[index];
         if (track?.id) context.router?.go(`/tracks/${encodeURIComponent(track.id)}`);
       });
       row.addEventListener('contextmenu', (event) => {
         event.preventDefault();
         const index = Number(row.getAttribute('data-track-index'));
-        const track = visibleTracks[index];
+        const track = sortedTracks[index];
         showContextMenu(event, [
-          { label: t('play', 'Play'), action: async () => context.player.replaceQueueFromTracks(visibleTracks, index, 'tracks', 'list', true) },
+          { label: t('play', 'Play'), action: async () => context.player.replaceQueueFromTracks(sortedTracks, index, 'tracks', 'list', true) },
           { label: t('add_to_queue', 'Add to queue'), action: async () => context.player.appendTracks([track]) },
           { label: t('view', 'View'), action: async () => context.router?.go(`/tracks/${encodeURIComponent(track.id)}`) },
           {
@@ -92,6 +95,8 @@ export async function renderTracks(context, root) {
         ]);
       });
     });
+
+    hydrateTrackDurations(list, sortedTracks);
   }
 
   searchInput?.addEventListener('input', () => {
@@ -102,6 +107,11 @@ export async function renderTracks(context, root) {
   duplicatesOnlyToggle?.addEventListener('change', () => {
     duplicatesOnly = Boolean(duplicatesOnlyToggle.checked);
     renderList();
+  });
+
+  sortSelect?.addEventListener('change', async () => {
+    currentSort = String(sortSelect.value || 'name').trim().toLowerCase() || 'name';
+    await loadData();
   });
 
   const refreshHandler = () => {
@@ -174,9 +184,54 @@ function normalizeTracks(raw, artistMap, albums) {
       artistId,
       albumId,
       albumTitle: album?.title || '',
+      year: Number(album?.year || 0) || 0,
+      createdAt: parseDateValue(track.created_at || track.createdAt || track.CreatedAt),
       durationSeconds: normalizeDurationSeconds(track),
     };
   });
+}
+
+function sortTracks(items, sortBy) {
+  const out = items.slice();
+  switch (String(sortBy || '').toLowerCase()) {
+    case 'created_at':
+      out.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+      break;
+    case 'year':
+      out.sort((a, b) => {
+        const ay = Number(a.year || 0);
+        const by = Number(b.year || 0);
+        if (ay <= 0 && by > 0) return 1;
+        if (by <= 0 && ay > 0) return -1;
+        if (ay !== by) return by - ay;
+        return String(a.title || '').localeCompare(String(b.title || ''), undefined, { sensitivity: 'base' });
+      });
+      break;
+    case 'duration':
+      out.sort((a, b) => {
+        const ad = Number(a.durationSeconds || 0);
+        const bd = Number(b.durationSeconds || 0);
+        if (ad <= 0 && bd > 0) return 1;
+        if (bd <= 0 && ad > 0) return -1;
+        if (ad !== bd) return bd - ad;
+        return String(a.title || '').localeCompare(String(b.title || ''), undefined, { sensitivity: 'base' });
+      });
+      break;
+    default:
+      out.sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), undefined, { sensitivity: 'base' }));
+      break;
+  }
+  return out;
+}
+
+function parseDateValue(value) {
+  if (!value) return 0;
+  const ts = Date.parse(String(value));
+  return Number.isFinite(ts) ? ts : 0;
+}
+
+function toBackendTrackSort(sortBy) {
+  return String(sortBy || '').toLowerCase() === 'created_at' ? 'created_at' : 'name';
 }
 
 function normalizeDurationSeconds(track) {
@@ -191,6 +246,50 @@ function formatDuration(seconds) {
   const minutes = Math.floor(safe / 60);
   const sec = safe % 60;
   return `${minutes}:${String(sec).padStart(2, '0')}`;
+}
+
+function hydrateTrackDurations(container, tracks) {
+  const byId = new Map((Array.isArray(tracks) ? tracks : []).map((track) => [String(track.id), track]));
+  container.querySelectorAll('[data-track-id]').forEach((row) => {
+    const trackId = String(row.getAttribute('data-track-id') || '').trim();
+    const track = byId.get(trackId);
+    if (!track?.id || Number(track.durationSeconds || 0) > 1) return;
+    const target = row.querySelector('.sh-detail-track-duration');
+    if (!target) return;
+    resolveStreamDuration(track.id).then((seconds) => {
+      if (seconds > 1) {
+        target.textContent = formatDuration(seconds);
+      }
+    }).catch(() => {});
+  });
+}
+
+const streamDurationCache = new Map();
+
+function resolveStreamDuration(trackId) {
+  if (streamDurationCache.has(trackId)) {
+    return streamDurationCache.get(trackId);
+  }
+  const pending = new Promise((resolve, reject) => {
+    const audio = new Audio();
+    audio.preload = 'metadata';
+    audio.src = API.streamUrl(trackId);
+    const cleanup = () => {
+      audio.removeAttribute('src');
+      audio.load();
+    };
+    audio.addEventListener('loadedmetadata', () => {
+      const seconds = Math.max(0, Math.round(Number(audio.duration || 0)));
+      cleanup();
+      resolve(seconds);
+    }, { once: true });
+    audio.addEventListener('error', () => {
+      cleanup();
+      reject(new Error('failed to probe duration'));
+    }, { once: true });
+  });
+  streamDurationCache.set(trackId, pending);
+  return pending;
 }
 
 function escapeHtml(value) {

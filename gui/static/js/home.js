@@ -5,6 +5,8 @@ import { showContextMenu } from './context-menu.js';
 export async function renderHome(context, root) {
   const blocksRoot = root.querySelector('#home-blocks');
   const waveBtn = root.querySelector('#home-wave-btn');
+  const waveGenreSelect = root.querySelector('#home-wave-genre');
+  let selectedWaveGenre = '';
   if (waveBtn) {
     waveBtn.textContent = t('play', 'Play');
   }
@@ -78,12 +80,20 @@ export async function renderHome(context, root) {
     });
   });
 
+  await populateWaveGenres(waveGenreSelect);
+  waveGenreSelect?.addEventListener('change', () => {
+    selectedWaveGenre = String(waveGenreSelect.value || '').trim();
+  });
+
   waveBtn?.addEventListener('click', async () => {
     const tracks = await API.getTracks({ limit: 2000, offset: 0, sort: 'name' });
-    const queue = Array.isArray(tracks) ? tracks.slice() : [];
+    let queue = Array.isArray(tracks) ? tracks.slice() : [];
+    if (selectedWaveGenre) {
+      queue = queue.filter((track) => trackMatchesGenre(track, selectedWaveGenre));
+    }
     if (!queue.length) return;
     shuffle(queue);
-    context.player.replaceQueueFromTracks(queue, 0, 'wave', 'all_tracks', true);
+    context.player.replaceQueueFromTracks(queue, 0, 'wave', selectedWaveGenre || 'all_tracks', true);
   });
 }
 
@@ -241,6 +251,50 @@ function shuffle(items) {
     items[i] = items[j];
     items[j] = tmp;
   }
+}
+
+async function populateWaveGenres(select) {
+  if (!select) return;
+  const baseOption = `<option value="" data-i18n="all_genres">${escapeHtml(t('all_genres', 'All genres'))}</option>`;
+  try {
+    const tracks = await API.getTracks({ limit: 5000, offset: 0, sort: 'name' });
+    const genres = collectGenres(Array.isArray(tracks) ? tracks : []);
+    select.innerHTML = [
+      baseOption,
+      ...genres.map((genre) => `<option value="${escapeHtml(genre)}">${escapeHtml(genre)}</option>`)
+    ].join('');
+  } catch {
+    select.innerHTML = baseOption;
+  }
+}
+
+function collectGenres(tracks) {
+  const set = new Set();
+  tracks.forEach((track) => {
+    splitGenres(track.genre || track.Genre || '').forEach((genre) => {
+      if (genre) set.add(genre);
+    });
+  });
+  return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+}
+
+function trackMatchesGenre(track, genre) {
+  const normalizedGenre = String(genre || '').trim().toLowerCase();
+  if (!normalizedGenre) return true;
+  return splitGenres(track.genre || track.Genre || '').some((value) => value.toLowerCase() === normalizedGenre);
+}
+
+function splitGenres(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return [];
+  const normalized = raw
+    .replaceAll('|', ';')
+    .replaceAll(' / ', ';')
+    .replaceAll('\\', ';');
+  return normalized
+    .split(/[;,]/)
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
 }
 
 async function openDetail(context, type, id, blockItems) {

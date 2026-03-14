@@ -17,18 +17,53 @@
       <div class="sh-brand">
         <img src="/static/logo.png" alt="Sonarium" class="sh-logo" />
         <span class="sh-brand-text"><span class="sh-brand-top">Berkut Solutions</span><span class="sh-brand-bottom">Sonarium</span></span>
+        <button type="button" class="icon-btn sidebar-toggle" id="sidebar-toggle" aria-label="Collapse sidebar" data-i18n-aria-label="sidebar_collapse">
+          <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16">
+            <path fill="currentColor" d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+          </svg>
+        </button>
       </div>
       <nav class="sh-nav" id="sidebar-nav">
-        <a href="/" data-route="/" data-i18n="home">Home</a>
-        <a href="/albums" data-route="/albums" data-i18n="albums">Albums</a>
-        <a href="/playlists" data-route="/playlists" data-i18n="playlists">Playlists</a>
-        <a href="/tracks" data-route="/tracks" data-i18n="tracks">Tracks</a>
-        <a href="/genres" data-route="/genres" data-i18n="genres">Genres</a>
-        <a href="/artists" data-route="/artists" data-i18n="artists">Artists</a>
-        <a href="/search" data-route="/search" data-i18n="search">Search</a>
-        <a href="/library" data-route="/library" data-i18n="library">Library</a>
-        <a href="/settings" data-route="/settings" data-i18n="settings">Settings</a>
-        <a href="/users" data-route="/users" id="nav-users" data-i18n="users" hidden>Users</a>
+        <a href="/" data-route="/" title="Home">
+          <span class="sh-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 3 3 10h2v10h5v-6h4v6h5V10h2z"/></svg></span>
+          <span class="sh-nav-label" data-i18n="home">Home</span>
+        </a>
+        <a href="/albums" data-route="/albums" title="Albums">
+          <span class="sh-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M3 6a3 3 0 0 1 3-3h7l8 8v7a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3zm12-1.5V10h5.5z"/></svg></span>
+          <span class="sh-nav-label" data-i18n="albums">Albums</span>
+        </a>
+        <a href="/playlists" data-route="/playlists" title="Playlists">
+          <span class="sh-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 6h12v2H4zm0 5h16v2H4zm0 5h10v2H4z"/></svg></span>
+          <span class="sh-nav-label" data-i18n="playlists">Playlists</span>
+        </a>
+        <a href="/tracks" data-route="/tracks" title="Tracks">
+          <span class="sh-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M15 5v9.55A4 4 0 1 0 17 18V9h4V5z"/></svg></span>
+          <span class="sh-nav-label" data-i18n="tracks">Tracks</span>
+        </a>
+        <a href="/genres" data-route="/genres" title="Genres">
+          <span class="sh-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 3 7v10l9 5 9-5V7zm0 2.2 6.8 3.8L12 11.8 5.2 8zM5 9.7l6 3.3V20l-6-3.3zm14 0v7L13 20v-7z"/></svg></span>
+          <span class="sh-nav-label" data-i18n="genres">Genres</span>
+        </a>
+        <a href="/artists" data-route="/artists" title="Artists">
+          <span class="sh-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8m-7 15c0-3 3.1-5 7-5s7 2 7 5v1H5z"/></svg></span>
+          <span class="sh-nav-label" data-i18n="artists">Artists</span>
+        </a>
+        <a href="/search" data-route="/search" title="Search">
+          <span class="sh-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M10.5 3a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15m7.9 13.9 2.8 2.8-1.4 1.4-2.8-2.8z"/></svg></span>
+          <span class="sh-nav-label" data-i18n="search">Search</span>
+        </a>
+        <a href="/library" data-route="/library" title="Library">
+          <span class="sh-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 4h14a2 2 0 0 1 2 2v14H6a2 2 0 0 1-2-2zm2 2v12h12V6zm14 1h2v13h-2z"/></svg></span>
+          <span class="sh-nav-label" data-i18n="library">Library</span>
+        </a>
+        <a href="/settings" data-route="/settings" title="Settings">
+          <span class="sh-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.14 12.94a7.43 7.43 0 0 0 .05-.94 7.43 7.43 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.32 7.32 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54a7.32 7.32 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.43 7.43 0 0 0-.05.94 7.43 7.43 0 0 0 .05.94L2.83 14.52a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96a7.32 7.32 0 0 0 1.63.94l.36 2.54a.5.5 0 0 0 .5.42h3.84a.5.5 0 0 0 .5-.42l.36-2.54a7.32 7.32 0 0 0 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/></svg></span>
+          <span class="sh-nav-label" data-i18n="settings">Settings</span>
+        </a>
+        <a href="/users" data-route="/users" id="nav-users" title="Users" hidden>
+          <span class="sh-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M16 11c1.66 0 3-1.57 3-3.5S17.66 4 16 4s-3 1.57-3 3.5 1.34 3.5 3 3.5m-8 0c1.66 0 3-1.57 3-3.5S9.66 4 8 4 5 5.57 5 7.5 6.34 11 8 11m0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5C15 14.17 10.33 13 8 13m8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.93 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5"/></svg></span>
+          <span class="sh-nav-label" data-i18n="users">Users</span>
+        </a>
       </nav>
       <div class="sidebar-footer">
         <div class="sidebar-tools">
@@ -47,7 +82,7 @@
             </svg>
           </button>
         </div>
-        <div id="sidebar-version" class="app-version" hidden>v1.0.2</div>
+        <div id="sidebar-version" class="app-version" hidden>v1.0.3</div>
       </div>
     </aside>
 

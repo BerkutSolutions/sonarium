@@ -106,18 +106,20 @@ export const API = {
   async getLibraryScanStatus() {
     return request('/api/library/scan/status');
   },
-  async uploadLibraryFile(file) {
+  async uploadLibraryFile(file, { skipDuplicates = false } = {}) {
     const form = new FormData();
     form.append('file', file, file.name);
+    form.append('skip_duplicates', skipDuplicates ? 'true' : 'false');
     const response = await fetch('/api/library/upload', {
       method: 'POST',
       body: form
     });
     return readEnvelope(response);
   },
-  uploadLibraryFileWithProgress(file, { onProgress, signal } = {}) {
+  uploadLibraryFileWithProgress(file, { onProgress, signal, skipDuplicates = false } = {}) {
     const form = new FormData();
     form.append('file', file, file.name);
+    form.append('skip_duplicates', skipDuplicates ? 'true' : 'false');
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', '/api/library/upload', true);
