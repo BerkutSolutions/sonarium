@@ -58,4 +58,11 @@
   "delete_all_music": "Удалить всю музыку",
   "delete_all_music_confirm": "Удалить всю музыкальную библиотеку? Это действие нельзя отменить.",
   "delete_all_music_failed": "Не удалось удалить музыкальную библиотеку"
+  ,
+  "upload_replace_duplicates": "Заменять дубликаты",
+  "check_integrity": "Проверить целостность",
+  "integrity_report": "Отчет о целостности",
+  "integrity_waiting": "Проверка целостности еще не запускалась.",
+  "integrity_ok": "Битые треки не найдены.",
+  "integrity_found": "Найдено битых треков"
 }

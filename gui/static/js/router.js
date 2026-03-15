@@ -20,8 +20,16 @@ const routes = [
 ];
 
 export function createRouter({ contentEl, titleEl, navEl, controllers, context }) {
+  let renderSeq = 0;
+
+  context.registerPageCleanup = (cleanup) => {
+    contentEl.__shCleanup = typeof cleanup === 'function' ? cleanup : null;
+  };
+
   async function renderPath(path, replace = false) {
+    const renderID = ++renderSeq;
     const route = resolveRoute(path);
+    invokePageCleanup();
     if (replace) {
       history.replaceState(normalizeState(history.state), '', path);
     }
@@ -35,6 +43,7 @@ export function createRouter({ contentEl, titleEl, navEl, controllers, context }
 
     if (route.page) {
       const pageHtml = await fetch(`/static/${route.page}.html`).then((res) => res.text());
+      if (renderID !== renderSeq) return;
       contentEl.innerHTML = pageHtml;
       applyTranslations(contentEl);
     } else {
@@ -44,6 +53,7 @@ export function createRouter({ contentEl, titleEl, navEl, controllers, context }
     const controller = controllers[route.controllerKey || route.page];
     if (controller) {
       await controller(context, contentEl, route.routeParams || {});
+      if (renderID !== renderSeq) return;
     }
     applyTranslations(contentEl);
   }
@@ -87,8 +97,31 @@ export function createRouter({ contentEl, titleEl, navEl, controllers, context }
     },
     refresh() {
       return renderPath(window.location.pathname || '/', true);
+    },
+    resetToPublicRoot() {
+      renderSeq += 1;
+      invokePageCleanup();
+      history.replaceState({ __sh_idx: 0 }, '', '/');
+      sessionStorage.setItem('sh-history-current', '0');
+      sessionStorage.setItem('sh-history-max', '0');
+      titleEl.textContent = 'Sonarium';
+      document.title = 'Sonarium';
+      contentEl.innerHTML = '';
+      navEl.querySelectorAll('[data-route]').forEach((link) => link.classList.remove('active'));
+      document.querySelector('.sh-content')?.classList.remove('detail-mode');
     }
   };
+}
+
+function invokePageCleanup() {
+  const cleanup = document.getElementById('page-content')?.__shCleanup;
+  if (typeof cleanup !== 'function') return;
+  document.getElementById('page-content').__shCleanup = null;
+  try {
+    cleanup();
+  } catch (_) {
+    // cleanup is best-effort
+  }
 }
 
 function normalizeState(state) {

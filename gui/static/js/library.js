@@ -138,6 +138,7 @@ const uploadManager = (() => {
           const payload = await API.uploadLibraryFileWithProgress(item.file, {
             signal: controller.signal,
             skipDuplicates: Boolean(options?.skipDuplicates),
+            duplicatePolicy: String(options?.duplicatePolicy || 'keep'),
             onProgress(progress) {
               item.loaded = progress.loaded;
               item.total = progress.total;
@@ -198,7 +199,7 @@ const uploadManager = (() => {
   return { subscribe, start, abort, clear };
 })();
 
-export async function renderLibrary(_context, root) {
+export async function renderLibrary(context, root) {
   const pathEl = root.querySelector('#library-path-value');
   const statusEl = root.querySelector('#library-scan-status');
   const statusHeroEl = root.querySelector('#library-scan-status-hero');
@@ -208,6 +209,7 @@ export async function renderLibrary(_context, root) {
   const fileInput = root.querySelector('#library-upload-file');
   const folderInput = root.querySelector('#library-upload-folder');
   const skipDuplicatesInput = root.querySelector('#library-upload-skip-duplicates');
+  const replaceDuplicatesInput = root.querySelector('#library-upload-replace-duplicates');
   const selectedEl = root.querySelector('#library-upload-selected');
   const resultEl = root.querySelector('#library-upload-result');
   const dropzone = root.querySelector('#library-upload-dropzone');
@@ -218,6 +220,10 @@ export async function renderLibrary(_context, root) {
   const cancelBtn = root.querySelector('#library-upload-cancel');
   const historyListEl = root.querySelector('#library-upload-history-list');
   const historyClearBtn = root.querySelector('#library-upload-history-clear');
+  const integrityBtn = root.querySelector('#library-integrity-btn');
+  const integritySection = root.querySelector('#library-integrity-section');
+  const integritySummaryEl = root.querySelector('#library-integrity-summary');
+  const integrityListEl = root.querySelector('#library-integrity-list');
   let uploadHistory = loadUploadHistory();
   let unsubscribe = null;
 
@@ -241,6 +247,9 @@ export async function renderLibrary(_context, root) {
   }
 
   function renderBatch(state) {
+    window.dispatchEvent(new CustomEvent('soundhub:upload-state', {
+      detail: { active: Boolean(state.running), running: Boolean(state.running) }
+    }));
     progressSection.hidden = !state.active;
     if (!state.active) {
       overallBarEl.style.width = '0%';
@@ -261,6 +270,34 @@ export async function renderLibrary(_context, root) {
       </div>
     `).join('');
     cancelBtn.hidden = !state.running;
+  }
+
+  function renderIntegrity(report) {
+    if (!integritySection || !integritySummaryEl || !integrityListEl) return;
+    integritySection.hidden = false;
+    const issues = Array.isArray(report?.issues) ? report.issues : [];
+    if (!issues.length) {
+      integritySummaryEl.textContent = t('integrity_ok', 'No broken tracks found.');
+      integrityListEl.innerHTML = `<p class="sh-library-panel-copy">${escapeHtml(t('integrity_ok', 'No broken tracks found.'))}</p>`;
+      return;
+    }
+    integritySummaryEl.textContent = `${t('integrity_found', 'Broken tracks found')}: ${issues.length}`;
+    integrityListEl.innerHTML = issues.map((issue) => `
+      <article class="sh-library-upload-history-entry">
+        <header>
+          <strong>${escapeHtml(issue.title || t('unknown_title', 'Unknown title'))}</strong>
+          <span>${escapeHtml(issue.severity || 'error')}</span>
+        </header>
+        <div class="sh-library-panel-copy">${escapeHtml(issue.reason || '')}</div>
+        <div class="sh-library-panel-copy">${escapeHtml(issue.file_path || '')}</div>
+      </article>
+    `).join('');
+  }
+
+  function currentDuplicatePolicy() {
+    if (replaceDuplicatesInput?.checked) return 'replace';
+    if (skipDuplicatesInput?.checked) return 'skip';
+    return 'keep';
   }
 
   function renderHistory() {
@@ -336,15 +373,37 @@ export async function renderLibrary(_context, root) {
     renderHistory();
   });
 
+  integrityBtn?.addEventListener('click', async () => {
+    integrityBtn.disabled = true;
+    try {
+      const report = await API.getLibraryIntegrity();
+      renderIntegrity(report);
+    } finally {
+      integrityBtn.disabled = false;
+    }
+  });
+
   form.addEventListener('submit', (event) => {
     event.preventDefault();
+  });
+
+  skipDuplicatesInput?.addEventListener('change', () => {
+    if (!skipDuplicatesInput.checked) return;
+    if (replaceDuplicatesInput) replaceDuplicatesInput.checked = false;
+  });
+  replaceDuplicatesInput?.addEventListener('change', () => {
+    if (!replaceDuplicatesInput.checked) return;
+    if (skipDuplicatesInput) skipDuplicatesInput.checked = false;
   });
 
   fileInput.addEventListener('change', async () => {
     const files = filterAudioFiles(Array.from(fileInput.files || []));
     if (!files.length) return;
     updateSelectedFiles(files);
-    const state = await uploadManager.start(files, { skipDuplicates: Boolean(skipDuplicatesInput?.checked) });
+    const state = await uploadManager.start(files, {
+      skipDuplicates: Boolean(skipDuplicatesInput?.checked),
+      duplicatePolicy: currentDuplicatePolicy()
+    });
     await reloadStatus();
     window.dispatchEvent(new CustomEvent('soundhub:library-updated'));
     appendHistory(state);
@@ -357,7 +416,10 @@ export async function renderLibrary(_context, root) {
     const files = filterAudioFiles(Array.from(folderInput.files || []));
     if (!files.length) return;
     updateSelectedFiles(files);
-    const state = await uploadManager.start(files, { skipDuplicates: Boolean(skipDuplicatesInput?.checked) });
+    const state = await uploadManager.start(files, {
+      skipDuplicates: Boolean(skipDuplicatesInput?.checked),
+      duplicatePolicy: currentDuplicatePolicy()
+    });
     await reloadStatus();
     window.dispatchEvent(new CustomEvent('soundhub:library-updated'));
     appendHistory(state);
@@ -381,7 +443,10 @@ export async function renderLibrary(_context, root) {
     const files = filterAudioFiles(await getDroppedAudioFiles(event));
     if (!files.length) return;
     updateSelectedFiles(files);
-    const state = await uploadManager.start(files, { skipDuplicates: Boolean(skipDuplicatesInput?.checked) });
+    const state = await uploadManager.start(files, {
+      skipDuplicates: Boolean(skipDuplicatesInput?.checked),
+      duplicatePolicy: currentDuplicatePolicy()
+    });
     await reloadStatus();
     window.dispatchEvent(new CustomEvent('soundhub:library-updated'));
     appendHistory(state);
@@ -389,9 +454,10 @@ export async function renderLibrary(_context, root) {
     updateSelectedFiles([]);
   });
 
-  root.addEventListener('DOMNodeRemoved', () => {
+  context.registerPageCleanup?.(() => {
     unsubscribe?.();
-  }, { once: true });
+    window.dispatchEvent(new CustomEvent('soundhub:upload-state', { detail: { active: false, running: false } }));
+  });
 
   function updateSelectedFiles(files) {
     if (!selectedEl) return;

@@ -3,6 +3,7 @@ package metadata
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -36,6 +37,12 @@ type AudioMetadata struct {
 }
 
 type Reader struct{}
+
+type ProbeResult struct {
+	DurationSeconds float64
+	BitRate         int
+	HasAudioStream  bool
+}
 
 func NewReader() *Reader {
 	return &Reader{}
@@ -188,10 +195,36 @@ func parseReplayGain(raw map[string]any, keys []string) float64 {
 }
 
 func (r *Reader) enrichWithFFprobe(filePath string, metadata *AudioMetadata) {
-	if metadata == nil {
+	probe, err := r.probeWithFFprobe(filePath)
+	if err != nil {
 		return
 	}
+	if metadata.Duration <= 0 && probe.DurationSeconds > 0 {
+		metadata.Duration = time.Duration(math.Round(probe.DurationSeconds * float64(time.Second)))
+	}
+	if metadata.Bitrate <= 0 && probe.BitRate > 0 {
+		metadata.Bitrate = probe.BitRate / 1000
+	}
+}
 
+func (r *Reader) Validate(filePath string) error {
+	probe, err := r.probeWithFFprobe(filePath)
+	if err != nil {
+		return err
+	}
+	if !probe.HasAudioStream {
+		return errors.New("no audio stream detected")
+	}
+	if probe.DurationSeconds <= 0 {
+		return errors.New("invalid audio duration")
+	}
+	if err := r.decodeWithFFmpeg(filePath); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *Reader) probeWithFFprobe(filePath string) (ProbeResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -199,34 +232,66 @@ func (r *Reader) enrichWithFFprobe(filePath string, metadata *AudioMetadata) {
 		ctx,
 		"ffprobe",
 		"-v", "error",
-		"-show_entries", "format=duration,bit_rate",
+		"-select_streams", "a:0",
+		"-show_entries", "stream=codec_type:format=duration,bit_rate",
 		"-of", "json",
 		filePath,
 	)
 
 	output, err := cmd.Output()
 	if err != nil {
-		return
+		return ProbeResult{}, fmt.Errorf("ffprobe validation failed: %w", err)
 	}
 
 	var payload struct {
+		Streams []struct {
+			CodecType string `json:"codec_type"`
+		} `json:"streams"`
 		Format struct {
 			Duration string `json:"duration"`
 			BitRate  string `json:"bit_rate"`
 		} `json:"format"`
 	}
 	if err := json.Unmarshal(output, &payload); err != nil {
-		return
+		return ProbeResult{}, fmt.Errorf("parse ffprobe payload: %w", err)
 	}
 
-	if metadata.Duration <= 0 {
-		if seconds, err := strconv.ParseFloat(strings.TrimSpace(payload.Format.Duration), 64); err == nil && seconds > 0 {
-			metadata.Duration = time.Duration(math.Round(seconds * float64(time.Second)))
-		}
+	result := ProbeResult{
+		HasAudioStream: len(payload.Streams) > 0,
 	}
-	if metadata.Bitrate <= 0 {
-		if bitrate, err := strconv.Atoi(strings.TrimSpace(payload.Format.BitRate)); err == nil && bitrate > 0 {
-			metadata.Bitrate = bitrate / 1000
-		}
+	if seconds, err := strconv.ParseFloat(strings.TrimSpace(payload.Format.Duration), 64); err == nil && seconds > 0 {
+		result.DurationSeconds = seconds
 	}
+	if bitrate, err := strconv.Atoi(strings.TrimSpace(payload.Format.BitRate)); err == nil && bitrate > 0 {
+		result.BitRate = bitrate
+	}
+	return result, nil
+}
+
+func (r *Reader) decodeWithFFmpeg(filePath string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(
+		ctx,
+		"ffmpeg",
+		"-v", "error",
+		"-xerror",
+		"-i", filePath,
+		"-map", "0:a:0",
+		"-f", "null",
+		"-",
+	)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, exec.ErrNotFound) {
+		return nil
+	}
+	message := strings.TrimSpace(string(output))
+	if message == "" {
+		message = err.Error()
+	}
+	return fmt.Errorf("ffmpeg decode validation failed: %s", message)
 }

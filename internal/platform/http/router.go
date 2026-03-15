@@ -116,6 +116,7 @@ func NewRouter(
 			api.Get("/library/artist-album-counts", libraryHandler.ArtistAlbumCounts)
 			api.Post("/library/scan", libraryHandler.Scan)
 			api.Get("/library/scan/status", libraryHandler.ScanStatus)
+			api.Get("/library/integrity", libraryHandler.Integrity)
 			api.Post("/library/favorites/tracks/{track_id}/toggle", libraryHandler.ToggleFavoriteTrack)
 			api.Post("/library/favorites/albums/{album_id}/toggle", libraryHandler.ToggleFavoriteAlbum)
 			api.Post("/library/favorites/artists/{artist_id}/toggle", libraryHandler.ToggleFavoriteArtist)

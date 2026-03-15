@@ -28,6 +28,7 @@ export class Player {
     this.queueToggle = root.querySelector('#player-queue-toggle');
     this.repeatButton = root.querySelector('#player-repeat');
     this.shuffleButton = root.querySelector('#player-shuffle');
+    this.favoriteButton = root.querySelector('#player-favorite');
     this.toggleButton = root.querySelector('#player-toggle');
     this.clearQueueButton = root.querySelector('#player-queue-clear');
 
@@ -36,10 +37,6 @@ export class Player {
     this.repeatMode = 'off';
     this._syncTimer = null;
     this._artistMapPromise = null;
-    this._audioContext = null;
-    this._analyser = null;
-    this._sourceNode = null;
-    this._visualizerFrame = 0;
     this._progressFrame = 0;
     this._restoredCurrentTime = 0;
     this._progressAnchorTime = 0;
@@ -47,6 +44,7 @@ export class Player {
     this._dragQueueIndex = -1;
     this._preparedDeletion = null;
     this._handlingMissingTrackID = '';
+    this._favoriteTrackIDs = new Set();
     this._queueOutsideClickHandler = (event) => {
       if (!this.queuePanel.classList.contains('open')) return;
       if (event.target.closest('#player-queue-panel')) return;
@@ -69,6 +67,9 @@ export class Player {
   }
 
   async _applyInitialState() {
+    if (this._isAuthenticated()) {
+      this._favoriteTrackIDs = await this._loadFavoriteTrackIDs();
+    }
     const local = loadPlaybackState();
     if (local) {
       const sanitizedLocal = this._isAuthenticated()
@@ -117,6 +118,9 @@ export class Player {
     });
     this.root.querySelector('#player-prev').addEventListener('click', () => this.previous());
     this.root.querySelector('#player-next').addEventListener('click', () => this.next());
+    this.favoriteButton?.addEventListener('click', async () => {
+      await this.toggleCurrentFavorite();
+    });
     this.shuffleButton.addEventListener('click', () => this.toggleShuffle());
     this.repeatButton.addEventListener('click', () => this.cycleRepeatMode());
     this.queueToggle.addEventListener('click', () => this.toggleQueuePanel());
@@ -144,7 +148,7 @@ export class Player {
       this.isPlaying = true;
       this._restoredCurrentTime = Math.max(0, Number(this.audio.currentTime || this._restoredCurrentTime || 0));
       this._syncProgressAnchor(this._restoredCurrentTime);
-      this._startVisualizer();
+      this._emitPlaybackState();
       this._startProgressLoop();
       this._renderControls();
       this._scheduleSync();
@@ -153,7 +157,7 @@ export class Player {
       this.isPlaying = false;
       this._restoredCurrentTime = Math.max(0, Number(this.audio.currentTime || this._restoredCurrentTime || 0));
       this._syncProgressAnchor(this._restoredCurrentTime);
-      this._stopVisualizer();
+      this._emitPlaybackState();
       this._stopProgressLoop();
       this._renderProgress();
       this._renderControls();
@@ -185,6 +189,7 @@ export class Player {
       this._renderProgress();
     });
     this.audio.addEventListener('ended', () => {
+      this._emitPlaybackState();
       this._stopProgressLoop();
       this.next(true);
     });
@@ -195,6 +200,12 @@ export class Player {
     window.addEventListener('resize', () => this._renderProgress());
     this.meta?.addEventListener('click', (event) => {
       if (event.target.closest('button')) return;
+      this._navigateToCurrentTrack();
+    });
+    this.meta?.addEventListener('keydown', (event) => {
+      if (!this.meta?.classList.contains('is-clickable')) return;
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
       this._navigateToCurrentTrack();
     });
   }
@@ -240,6 +251,25 @@ export class Player {
     this.replaceQueueFromTracks(tracks, startIndex, 'tracks', 'list', true);
   }
 
+  async toggleCurrentFavorite() {
+    const current = this.queue.current();
+    const trackID = String(current?.track_id || '').trim();
+    if (!trackID) return;
+    try {
+      const result = await API.toggleFavoriteTrack(trackID);
+      const favorite = Boolean(result?.favorite);
+      if (favorite) {
+        this._favoriteTrackIDs.add(trackID);
+      } else {
+        this._favoriteTrackIDs.delete(trackID);
+      }
+      this._renderFavoriteButton();
+      window.dispatchEvent(new CustomEvent('soundhub:library-updated'));
+    } catch (_) {
+      // best-effort UI action
+    }
+  }
+
   isCurrentTrack(trackID) {
     return String(this.queue.current()?.track_id || '').trim() === String(trackID || '').trim();
   }
@@ -254,8 +284,7 @@ export class Player {
       wasPlaying: !this.audio.paused
     };
     this.audio.pause();
-    this.audio.removeAttribute('src');
-    this.audio.load();
+    this._detachAudioSource();
     this.isPlaying = false;
     this._restoredCurrentTime = this._preparedDeletion.currentTime;
     this._syncProgressAnchor(this._restoredCurrentTime);
@@ -299,8 +328,7 @@ export class Player {
       return;
     }
     this.audio.pause();
-    this.audio.removeAttribute('src');
-    this.audio.load();
+    this._detachAudioSource();
     this.isPlaying = false;
     this._restoredCurrentTime = 0;
     this._syncProgressAnchor(0);
@@ -338,7 +366,6 @@ export class Player {
       // metadata may not be ready yet
     }
     this.audio.src = API.streamUrl(current.track_id);
-    this.audio.load();
     this._recordPlayed(current.track_id);
     this._resolveArtistName(current);
     this._hydrateCurrentMetadata(current);
@@ -399,8 +426,7 @@ export class Player {
   clearQueue() {
     this.queue.clear();
     this.audio.pause();
-    this.audio.removeAttribute('src');
-    this.audio.load();
+    this._detachAudioSource();
     this._pushQueueClear();
     this._render();
     this._scheduleSync();
@@ -416,11 +442,19 @@ export class Player {
         this.cover.src = '/static/logo.png';
       };
       this.meta?.classList.add('is-clickable');
+      this.meta?.setAttribute('tabindex', '0');
+      this.meta?.setAttribute('role', 'button');
+      this.meta?.setAttribute('aria-label', t('track_info', 'Track information'));
+      this.meta?.setAttribute('title', t('track_info', 'Track information'));
     } else {
       this.title.textContent = t('player_no_track', 'No track selected');
       this.artist.textContent = '-';
       this.cover.src = '/static/logo.png';
       this.meta?.classList.remove('is-clickable');
+      this.meta?.removeAttribute('tabindex');
+      this.meta?.removeAttribute('role');
+      this.meta?.removeAttribute('aria-label');
+      this.meta?.removeAttribute('title');
     }
     this.volume.value = String(this.audio.volume || 1);
     this._setVolumeVisual(Number(this.audio.volume || 1));
@@ -429,15 +463,32 @@ export class Player {
     this.repeatButton.setAttribute('title', formatRepeatLabel(this.repeatMode));
     this.shuffleButton.classList.toggle('active', this.queue.shuffleEnabled);
     this._renderQueue();
-    this._drawLiveSpectrum(this.audio.paused || this.audio.ended);
     this._renderControls();
     applyTranslations(this.root);
+    this._renderFavoriteButton();
   }
 
   _renderControls() {
     this.toggleButton.classList.toggle('is-playing', this.isPlaying);
     this.toggleButton.setAttribute('aria-label', this.isPlaying ? t('player_pause', 'Pause') : t('player_play', 'Play'));
     this.toggleButton.setAttribute('data-i18n-aria-label', this.isPlaying ? 'player_pause' : 'player_play');
+  }
+
+  _emitPlaybackState() {
+    window.dispatchEvent(new CustomEvent('soundhub:playback-state', {
+      detail: { playing: Boolean(this.isPlaying && !this.audio.paused && !this.audio.ended) }
+    }));
+  }
+
+  _renderFavoriteButton() {
+    if (!this.favoriteButton) return;
+    const currentID = String(this.queue.current()?.track_id || '').trim();
+    const active = Boolean(currentID) && this._favoriteTrackIDs.has(currentID);
+    const label = active ? t('unlike', 'Dislike') : t('like', 'Like');
+    this.favoriteButton.classList.toggle('is-active', active);
+    this.favoriteButton.disabled = !currentID;
+    this.favoriteButton.setAttribute('aria-label', label);
+    this.favoriteButton.setAttribute('title', label);
   }
 
   _renderQueue() {
@@ -658,13 +709,11 @@ export class Player {
         if (hydrateMedia && this._isAuthenticated()) {
           this.cover.src = current.cover_ref ? API.albumCoverThumbUrl(current.cover_ref, 256) : '/static/logo.png';
           this.audio.src = API.streamUrl(current.track_id);
-          this.audio.load();
           this._resolveArtistName(current);
           this._hydrateCurrentMetadata(current);
         } else {
           this.cover.src = '/static/logo.png';
-          this.audio.removeAttribute('src');
-          this.audio.load();
+          this._detachAudioSource();
         }
       }
       this._render();
@@ -674,12 +723,16 @@ export class Player {
   onAuthChanged(status) {
     if (!status?.authenticated) {
       this.audio.pause();
-      this.audio.removeAttribute('src');
-      this.audio.load();
+      this._detachAudioSource();
       this.cover.src = '/static/logo.png';
+      this._favoriteTrackIDs = new Set();
       this._render();
       return;
     }
+    this._loadFavoriteTrackIDs().then((ids) => {
+      this._favoriteTrackIDs = ids;
+      this._renderFavoriteButton();
+    }).catch(() => {});
     const local = loadPlaybackState();
     if (local) {
       this._sanitizeStateAgainstLibrary(local)
@@ -737,6 +790,7 @@ export class Player {
     }
     this._renderQueue();
     applyTranslations(this.root);
+    this._renderFavoriteButton();
   }
 
   _scheduleSync() {
@@ -874,52 +928,23 @@ export class Player {
     return typeof this.auth?.isAuthenticated === 'function' ? this.auth.isAuthenticated() : true;
   }
 
+  async _loadFavoriteTrackIDs() {
+    try {
+      const home = await API.getHome(500);
+      return new Set(
+        (home?.favorites?.tracks || [])
+          .map((track) => String(track?.id || track?.ID || '').trim())
+          .filter(Boolean)
+      );
+    } catch (_) {
+      return new Set();
+    }
+  }
+
   _navigateToCurrentTrack() {
     const trackId = String(this.queue.current()?.track_id || '').trim();
     if (!trackId) return;
     window.dispatchEvent(new CustomEvent('soundhub:navigate', { detail: { path: `/tracks/${encodeURIComponent(trackId)}` } }));
-  }
-
-  _startVisualizer() {
-    if (!this.waveformCanvas) return;
-    if (this._visualizerFrame) return;
-    if (typeof window.AudioContext === 'undefined' && typeof window.webkitAudioContext === 'undefined') {
-      return;
-    }
-    try {
-      if (!this._audioContext) {
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        this._audioContext = new Ctx();
-        this._analyser = this._audioContext.createAnalyser();
-        this._analyser.fftSize = 256;
-        this._analyser.smoothingTimeConstant = 0.78;
-        this._sourceNode = this._audioContext.createMediaElementSource(this.audio);
-        this._sourceNode.connect(this._analyser);
-        this._analyser.connect(this._audioContext.destination);
-      }
-      if (this._audioContext.state === 'suspended') {
-        this._audioContext.resume().catch(() => {});
-      }
-      const draw = () => {
-        this._drawLiveSpectrum();
-        if (!this.audio.paused && !this.audio.ended) {
-          this._visualizerFrame = window.requestAnimationFrame(draw);
-          return;
-        }
-        this._visualizerFrame = 0;
-      };
-      this._visualizerFrame = window.requestAnimationFrame(draw);
-    } catch (_) {
-      this._drawLiveSpectrum(true);
-    }
-  }
-
-  _stopVisualizer() {
-    if (this._visualizerFrame) {
-      window.cancelAnimationFrame(this._visualizerFrame);
-      this._visualizerFrame = 0;
-    }
-    this._drawLiveSpectrum(true);
   }
 
   _startProgressLoop() {
@@ -943,32 +968,12 @@ export class Player {
     this._renderProgress();
   }
 
-  _drawLiveSpectrum(empty = false) {
-    if (!this.waveformCanvas) return;
-    const canvas = this.waveformCanvas;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const width = canvas.width;
-    const height = canvas.height;
-    ctx.clearRect(0, 0, width, height);
-    if (empty || !this._analyser) return;
-
-    const bins = this._analyser.frequencyBinCount;
-    const data = new Uint8Array(bins);
-    this._analyser.getByteFrequencyData(data);
-
-    const bars = Math.min(72, bins);
-    const step = Math.max(1, Math.floor(bins / bars));
-    const barWidth = Math.max(2, Math.floor(width / bars) - 1);
-    for (let i = 0; i < bars; i += 1) {
-      const value = data[i * step] || 0;
-      const amp = value / 255;
-      const barHeight = Math.max(2, Math.floor(amp * (height - 8)));
-      const x = i * (barWidth + 1);
-      const y = height - barHeight - 3;
-      const color = `rgba(${38 + Math.floor(amp * 24)}, ${62 + Math.floor(amp * 52)}, ${118 + Math.floor(amp * 76)}, 0.86)`;
-      ctx.fillStyle = color;
-      ctx.fillRect(x, y, barWidth, barHeight);
+  _detachAudioSource() {
+    try {
+      this.audio.removeAttribute('src');
+      this.audio.src = '';
+    } catch (_) {
+      // best-effort detach
     }
   }
 

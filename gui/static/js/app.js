@@ -74,6 +74,8 @@ async function init() {
   if (authStatus?.authenticated) {
     await syncSidebarVersion(sidebarVersion);
     await router.start();
+  } else {
+    router.resetToPublicRoot();
   }
 
   window.addEventListener('soundhub:lang-changed', async () => {
@@ -93,10 +95,10 @@ async function init() {
       await router.start();
       return;
     }
+    router.resetToPublicRoot();
     if (sidebarVersion) {
       sidebarVersion.hidden = true;
     }
-    document.getElementById('page-content').innerHTML = '';
   });
 
   window.addEventListener('soundhub:open-profile', async () => {

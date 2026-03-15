@@ -301,11 +301,12 @@ export async function renderPlaylistDetail(context, root, params) {
 
 export async function renderTrackDetail(context, root, params) {
   const trackId = String(params.trackId || '').trim();
-  const [artistMap, artistsRaw, albumsRaw, trackRaw] = await Promise.all([
+  const [artistMap, artistsRaw, albumsRaw, trackRaw, favoriteTrackIDs] = await Promise.all([
     loadArtistNameMap(),
     API.getArtists({ limit: 500, offset: 0, sort: 'name' }),
     API.getAlbums({ limit: 500, offset: 0, sort: 'year' }),
-    API.getTrack(trackId)
+    API.getTrack(trackId),
+    loadFavoriteTrackIDs()
   ]);
   const artists = normalizeArtists(artistsRaw);
   const albums = normalizeAlbums(albumsRaw, artistMap);
@@ -325,6 +326,7 @@ export async function renderTrackDetail(context, root, params) {
     cover: coverMarkup(track.albumId ? `/api/covers/album/${encodeURIComponent(track.albumId)}` : '/static/logo.png', track.title, 'sh-detail-cover'),
     actions: renderActions([
       { id: 'play', label: t('play', 'Play') },
+      { id: 'favorite', label: favoriteTrackIDs.has(track.id) ? t('unlike', 'Dislike') : t('like', 'Like'), icon: 'heart', active: favoriteTrackIDs.has(track.id) },
       { id: 'queue', label: t('add_to_queue', 'Add to queue') },
       { id: 'album', label: t('album_contents', 'Album') }
     ]),
@@ -345,6 +347,17 @@ export async function renderTrackDetail(context, root, params) {
   });
   bindDetailActions(root, context, {
     play: () => context.player.playTrack(track),
+    favorite: async (button) => {
+      const result = await API.toggleFavoriteTrack(track.id);
+      const favorite = Boolean(result?.favorite);
+      button?.classList.toggle('active', favorite);
+      button?.setAttribute('data-favorite-active', favorite ? 'true' : 'false');
+      const label = button?.querySelector('.sh-detail-action-label');
+      if (label) {
+        label.textContent = favorite ? t('unlike', 'Dislike') : t('like', 'Like');
+      }
+      window.dispatchEvent(new CustomEvent('soundhub:library-updated'));
+    },
     queue: () => context.player.appendTracks([track]),
     album: () => {
       if (track.albumId) context.router.go(`/albums/${encodeURIComponent(track.albumId)}`);
@@ -440,8 +453,9 @@ function renderDetailHistory() {
 
 function renderActions(items) {
   return items.map((item) => `
-    <button type="button" class="sh-detail-action${item.id === 'play' ? ' primary' : ''}" data-detail-action="${escapeHtml(item.id)}">
-      ${escapeHtml(item.label)}
+    <button type="button" class="sh-detail-action${item.id === 'play' ? ' primary' : ''}${item.active ? ' active' : ''}${item.icon ? ` sh-detail-action-${escapeHtml(item.icon)}` : ''}" data-detail-action="${escapeHtml(item.id)}"${item.active ? ' data-favorite-active="true"' : ''}>
+      ${item.icon === 'heart' ? '<span class="sh-detail-action-icon" aria-hidden="true">&#10084;</span>' : ''}
+      <span class="sh-detail-action-label">${escapeHtml(item.label)}</span>
     </button>
   `).join('');
 }
@@ -560,9 +574,9 @@ function renderEditControl(field) {
 
 function bindDetailActions(root, context, handlers) {
   root.querySelectorAll('[data-detail-action]').forEach((button) => {
-    button.addEventListener('click', () => {
+    button.addEventListener('click', async () => {
       const action = button.getAttribute('data-detail-action') || '';
-      handlers[action]?.();
+      await handlers[action]?.(button);
     });
   });
 }

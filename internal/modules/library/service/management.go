@@ -46,6 +46,11 @@ type SettingsInfo struct {
 	CanCheckUpdates   bool                       `json:"can_check_updates"`
 }
 
+type IntegrityReport struct {
+	Issues    []IntegrityIssue `json:"issues"`
+	CheckedAt time.Time        `json:"checked_at"`
+}
+
 type ManagementService struct {
 	cfg       config.Config
 	scanSvc   *ScanService
@@ -120,7 +125,7 @@ func (s *ManagementService) runScan() {
 	s.state.CompletedAt = time.Now().UTC()
 }
 
-func (s *ManagementService) SaveUpload(ctx context.Context, userID, fileName string, src io.Reader, skipDuplicates bool) (string, error) {
+func (s *ManagementService) SaveUpload(ctx context.Context, userID, fileName string, src io.Reader, duplicatePolicy DuplicatePolicy) (string, error) {
 	ext := strings.ToLower(filepath.Ext(fileName))
 	switch ext {
 	case ".mp3", ".flac", ".ogg", ".m4a":
@@ -166,11 +171,14 @@ func (s *ManagementService) SaveUpload(ctx context.Context, userID, fileName str
 		return "", fmt.Errorf("copy upload: %w", err)
 	}
 
-	if err := s.scanSvc.ScanUploadedFile(ctx, target, userID, skipDuplicates); err != nil {
+	if err := s.scanSvc.ScanUploadedFile(ctx, target, userID, duplicatePolicy); err != nil {
 		if errors.Is(err, ErrDuplicateUpload) {
 			_ = os.Remove(target)
 			s.completeUpload(nil)
 			return "", ErrDuplicateUpload
+		}
+		if errors.Is(err, ErrInvalidTrackIntegrity) {
+			_ = os.Remove(target)
 		}
 		s.completeUpload(err)
 		return "", fmt.Errorf("index uploaded file: %w", err)
@@ -178,6 +186,20 @@ func (s *ManagementService) SaveUpload(ctx context.Context, userID, fileName str
 
 	s.completeUpload(nil)
 	return target, nil
+}
+
+func (s *ManagementService) IntegrityReport(ctx context.Context) (IntegrityReport, error) {
+	if s.scanSvc == nil {
+		return IntegrityReport{Issues: []IntegrityIssue{}, CheckedAt: time.Now().UTC()}, nil
+	}
+	issues, err := s.scanSvc.CheckIntegrity(ctx)
+	if err != nil {
+		return IntegrityReport{}, err
+	}
+	return IntegrityReport{
+		Issues:    issues,
+		CheckedAt: time.Now().UTC(),
+	}, nil
 }
 
 func (s *ManagementService) completeUpload(err error) {

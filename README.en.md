@@ -8,11 +8,14 @@
 
 Sonarium is a self-hosted music platform for local libraries: streaming, smart player UX, collections, collaboration, and a built-in web interface with no SaaS dependency.
 
-Current version: `1.0.4`
+Current version: `1.0.5`
 
-## What's New In 1.0.4
+## What's New In 1.0.5
 
-- Collapsible sidebar with updated navigation icons.
+- Like button in the player and on the track detail page.
+- Additional player cleanup fix when deleting the currently playing track.
+- Immediate redirect to the login screen when the session expires, without requiring a manual page refresh.
+- Automatic session keepalive while music is actively playing.
 - Better upload flow in Library:
   - `Do not upload duplicates` option (enabled by default).
   - Duplicate detection by title and metadata identity (`title + artist + genre`).

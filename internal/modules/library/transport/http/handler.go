@@ -43,7 +43,8 @@ type Management interface {
 	LibraryPath() string
 	ScanStatus() libraryservice.ScanState
 	TriggerScan() bool
-	SaveUpload(ctx context.Context, userID, fileName string, src io.Reader, skipDuplicates bool) (string, error)
+	SaveUpload(ctx context.Context, userID, fileName string, src io.Reader, duplicatePolicy libraryservice.DuplicatePolicy) (string, error)
+	IntegrityReport(ctx context.Context) (libraryservice.IntegrityReport, error)
 	Settings(ctx context.Context) libraryservice.SettingsInfo
 	CheckUpdates(ctx context.Context) (*appmeta.UpdateCheckResult, error)
 	StorageUsage(ctx context.Context) (libraryrepo.StorageUsage, error)
@@ -206,14 +207,21 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	skipDuplicates := strings.EqualFold(strings.TrimSpace(r.FormValue("skip_duplicates")), "true")
-	path, err := h.management.SaveUpload(r.Context(), currentUserID(r.Context()), header.Filename, file, skipDuplicates)
+	duplicatePolicy := normalizeDuplicatePolicy(
+		r.FormValue("duplicate_policy"),
+		strings.EqualFold(strings.TrimSpace(r.FormValue("skip_duplicates")), "true"),
+	)
+	path, err := h.management.SaveUpload(r.Context(), currentUserID(r.Context()), header.Filename, file, duplicatePolicy)
 	if err != nil {
 		if errors.Is(err, libraryservice.ErrDuplicateUpload) {
 			response.WriteOK(w, map[string]any{"data": map[string]any{
 				"stored_path": "",
 				"status":      "skipped",
 			}})
+			return
+		}
+		if errors.Is(err, libraryservice.ErrInvalidTrackIntegrity) {
+			response.WriteError(w, apperrors.NewBadRequest("uploaded file failed integrity validation"))
 			return
 		}
 		response.WriteError(w, apperrors.NewBadRequest(err.Error()))
@@ -223,6 +231,15 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 		"stored_path": path,
 		"status":      "uploaded",
 	}})
+}
+
+func (h *Handler) Integrity(w http.ResponseWriter, r *http.Request) {
+	report, err := h.management.IntegrityReport(r.Context())
+	if err != nil {
+		response.WriteError(w, apperrors.NewInternal("failed to check library integrity"))
+		return
+	}
+	response.WriteOK(w, map[string]any{"data": report})
 }
 
 func (h *Handler) Settings(w http.ResponseWriter, r *http.Request) {
@@ -627,4 +644,20 @@ func currentUserID(ctx context.Context) string {
 		return userID
 	}
 	return libraryservice.DefaultUserID
+}
+
+func normalizeDuplicatePolicy(raw string, skipDuplicates bool) libraryservice.DuplicatePolicy {
+	value := strings.ToLower(strings.TrimSpace(raw))
+	switch value {
+	case string(libraryservice.DuplicatePolicySkip):
+		return libraryservice.DuplicatePolicySkip
+	case string(libraryservice.DuplicatePolicyReplace):
+		return libraryservice.DuplicatePolicyReplace
+	case string(libraryservice.DuplicatePolicyKeep):
+		return libraryservice.DuplicatePolicyKeep
+	}
+	if skipDuplicates {
+		return libraryservice.DuplicatePolicySkip
+	}
+	return libraryservice.DuplicatePolicyKeep
 }

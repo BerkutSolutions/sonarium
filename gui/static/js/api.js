@@ -106,20 +106,22 @@ export const API = {
   async getLibraryScanStatus() {
     return request('/api/library/scan/status');
   },
-  async uploadLibraryFile(file, { skipDuplicates = false } = {}) {
+  async uploadLibraryFile(file, { duplicatePolicy = 'keep', skipDuplicates = false } = {}) {
     const form = new FormData();
     form.append('file', file, file.name);
     form.append('skip_duplicates', skipDuplicates ? 'true' : 'false');
+    form.append('duplicate_policy', String(duplicatePolicy || 'keep'));
     const response = await fetch('/api/library/upload', {
       method: 'POST',
       body: form
     });
     return readEnvelope(response);
   },
-  uploadLibraryFileWithProgress(file, { onProgress, signal, skipDuplicates = false } = {}) {
+  uploadLibraryFileWithProgress(file, { onProgress, signal, duplicatePolicy = 'keep', skipDuplicates = false } = {}) {
     const form = new FormData();
     form.append('file', file, file.name);
     form.append('skip_duplicates', skipDuplicates ? 'true' : 'false');
+    form.append('duplicate_policy', String(duplicatePolicy || 'keep'));
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', '/api/library/upload', true);
@@ -164,6 +166,9 @@ export const API = {
   },
   async getStorageUsage() {
     return request('/api/settings/storage');
+  },
+  async getLibraryIntegrity() {
+    return request('/api/library/integrity');
   },
   async deleteAllMusic() {
     return post('/api/settings/library/delete-all', {});
@@ -274,6 +279,8 @@ export const API = {
   }
 };
 
+let unauthorizedNotified = false;
+
 async function request(path, query = {}) {
   const url = new URL(path, window.location.origin);
   Object.entries(query).forEach(([key, value]) => {
@@ -296,11 +303,23 @@ async function post(path, payload) {
 }
 
 async function readEnvelope(response) {
-  const payload = await response.json();
+  const text = await response.text();
+  const payload = safeParseJSON(text) || {};
+  if (response.status === 401) {
+    notifyUnauthorized();
+  } else if (response.ok) {
+    unauthorizedNotified = false;
+  }
   if (!response.ok || payload.error) {
     throw new Error(payload?.error?.message || 'API request failed');
   }
   return payload.data;
+}
+
+function notifyUnauthorized() {
+  if (unauthorizedNotified) return;
+  unauthorizedNotified = true;
+  window.dispatchEvent(new CustomEvent('soundhub:session-expired'));
 }
 
 function safeParseJSON(value) {

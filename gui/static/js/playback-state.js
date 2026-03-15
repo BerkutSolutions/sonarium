@@ -23,6 +23,14 @@ export function savePlaybackState(state) {
   }
 }
 
+export function clearPlaybackState() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (_) {
+    // best-effort cleanup
+  }
+}
+
 export function sanitizeState(raw) {
   if (!raw || typeof raw !== 'object') return null;
 

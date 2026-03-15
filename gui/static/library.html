@@ -33,7 +33,18 @@
 
       <div class="sh-library-panel-actions">
         <button type="button" id="scan-library-btn" data-i18n="scan_library">Scan Library</button>
+        <button type="button" id="library-integrity-btn" class="btn ghost" data-i18n="check_integrity">Check integrity</button>
       </div>
+
+      <section id="library-integrity-section" class="sh-library-upload-history" hidden>
+        <div class="sh-library-panel-head">
+          <div>
+            <h3 data-i18n="integrity_report">Integrity report</h3>
+            <p id="library-integrity-summary" class="sh-library-panel-copy" data-i18n="integrity_waiting">Integrity check has not been run yet.</p>
+          </div>
+        </div>
+        <div id="library-integrity-list" class="sh-library-upload-history-list"></div>
+      </section>
     </section>
 
     <section class="sh-library-panel sh-library-panel-upload">
@@ -52,6 +63,10 @@
         <label class="sh-library-upload-option">
           <input id="library-upload-skip-duplicates" type="checkbox" checked />
           <span data-i18n="upload_skip_duplicates">Do not upload duplicates</span>
+        </label>
+        <label class="sh-library-upload-option">
+          <input id="library-upload-replace-duplicates" type="checkbox" />
+          <span data-i18n="upload_replace_duplicates">Replace duplicates</span>
         </label>
         <span id="library-upload-selected" class="sh-library-upload-selected" data-i18n="library_no_files_selected">No files selected</span>
       </form>

@@ -1,5 +1,6 @@
 import { API } from './api.js';
 import { t } from './i18n.js';
+import { clearPlaybackState } from './playback-state.js';
 
 export function createAuthManager() {
   const overlay = document.getElementById('auth-overlay');
@@ -18,6 +19,9 @@ export function createAuthManager() {
   let status = null;
   let idleTimer = null;
   let countdownTimer = null;
+  let playbackKeepAliveTimer = null;
+  let playbackActive = false;
+  let uploadActive = false;
   let currentUser = null;
 
   function bind() {
@@ -81,6 +85,19 @@ export function createAuthManager() {
     });
     profileBtn?.addEventListener('mouseenter', showProfileCard);
     profileBtn?.addEventListener('mouseleave', hideProfileCard);
+    window.addEventListener('soundhub:session-expired', () => {
+      forceLoggedOut();
+    });
+    window.addEventListener('soundhub:playback-state', (event) => {
+      playbackActive = Boolean(event?.detail?.playing);
+      refreshIdleTimer();
+      syncPlaybackKeepAlive();
+    });
+    window.addEventListener('soundhub:upload-state', (event) => {
+      uploadActive = Boolean(event?.detail?.active || event?.detail?.running);
+      refreshIdleTimer();
+      syncPlaybackKeepAlive();
+    });
   }
 
   async function init() {
@@ -107,6 +124,7 @@ export function createAuthManager() {
     if (usersLink) {
       usersLink.hidden = currentUser?.role !== 'admin';
     }
+    syncPlaybackKeepAlive();
     refreshIdleTimer();
     renderSessionRemaining();
   }
@@ -114,6 +132,7 @@ export function createAuthManager() {
   function refreshIdleTimer() {
     if (idleTimer) window.clearTimeout(idleTimer);
     if (!status?.authenticated) return;
+    if (playbackActive || uploadActive) return;
     const timeoutMs = Math.max(1000, Number(status.session_idle_timeout_seconds || 0) * 1000);
     idleTimer = window.setTimeout(() => {
       logout(true).catch(() => {});
@@ -137,9 +156,50 @@ export function createAuthManager() {
         await API.logout();
       } catch {}
     }
+    clearPlaybackState();
     status = await API.getAuthStatus();
     applyStatus(status);
     window.dispatchEvent(new CustomEvent('soundhub:auth-changed', { detail: status }));
+  }
+
+  function forceLoggedOut() {
+    stopPlaybackKeepAlive();
+    playbackActive = false;
+    uploadActive = false;
+    clearPlaybackState();
+    status = {
+      authenticated: false,
+      registration_open: Boolean(status?.registration_open),
+      setup_required: false
+    };
+    applyStatus(status);
+    window.dispatchEvent(new CustomEvent('soundhub:auth-changed', { detail: status }));
+  }
+
+  function syncPlaybackKeepAlive() {
+    if (!status?.authenticated || (!playbackActive && !uploadActive)) {
+      stopPlaybackKeepAlive();
+      return;
+    }
+    if (playbackKeepAliveTimer) return;
+    playbackKeepAliveTimer = window.setInterval(async () => {
+      if (!status?.authenticated || (!playbackActive && !uploadActive)) {
+        stopPlaybackKeepAlive();
+        return;
+      }
+      try {
+        status = await API.getAuthStatus();
+        applyStatus(status);
+      } catch {
+        // unauthorized path is handled centrally in api.js
+      }
+    }, 60000);
+  }
+
+  function stopPlaybackKeepAlive() {
+    if (!playbackKeepAliveTimer) return;
+    window.clearInterval(playbackKeepAliveTimer);
+    playbackKeepAliveTimer = null;
   }
 
   function isAuthenticated() {

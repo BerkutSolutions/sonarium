@@ -63,3 +63,14 @@ func (r *FileFingerprintRepository) Upsert(ctx context.Context, filePath string,
 	}
 	return nil
 }
+
+func (r *FileFingerprintRepository) Delete(ctx context.Context, filePath string) error {
+	_, err := r.db.ExecContext(ctx, `
+		DELETE FROM library_file_fingerprints
+		WHERE file_path = $1
+	`, filePath)
+	if err != nil {
+		return fmt.Errorf("delete fingerprint: %w", err)
+	}
+	return nil
+}

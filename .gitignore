@@ -17,6 +17,7 @@ build/
 
 # Go
 .gocache/
+.gocache_run/
 coverage.out
 *.test
 

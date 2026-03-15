@@ -15,13 +15,18 @@ export async function renderTracks(context, root) {
   let searchTerm = '';
   let duplicatesOnly = false;
   let currentSort = String(sortSelect?.value || 'name').trim().toLowerCase() || 'name';
+  let disposed = false;
+  let loadSeq = 0;
+  let renderSeq = 0;
 
   async function loadData() {
+    const requestID = ++loadSeq;
     const [tracksRaw, albumsRaw, artists] = await Promise.all([
       API.getTracks({ limit: 5000, offset: 0, sort: toBackendTrackSort(currentSort) }),
       API.getAlbums({ limit: 500, offset: 0, sort: 'year' }),
       loadArtistNameMap(),
     ]);
+    if (disposed || requestID !== loadSeq) return;
     artistMap = artists;
     albums = normalizeAlbums(albumsRaw, artistMap);
     tracks = normalizeTracks(tracksRaw, artistMap, albums);
@@ -29,6 +34,7 @@ export async function renderTracks(context, root) {
   }
 
   function renderList() {
+    const currentRenderID = ++renderSeq;
     const visibleTracks = filterTracks(tracks, {
       searchTerm,
       duplicatesOnly
@@ -106,7 +112,7 @@ export async function renderTracks(context, root) {
       });
     });
 
-    hydrateTrackDurations(list, sortedTracks);
+    hydrateTrackDurations(list, sortedTracks, () => !disposed && currentRenderID === renderSeq);
   }
 
   searchInput?.addEventListener('input', () => {
@@ -125,16 +131,15 @@ export async function renderTracks(context, root) {
   });
 
   const refreshHandler = () => {
+    if (disposed) return;
     loadData().catch(() => {});
   };
   window.addEventListener('soundhub:library-updated', refreshHandler);
-  root.addEventListener(
-    'DOMNodeRemoved',
-    () => {
-      window.removeEventListener('soundhub:library-updated', refreshHandler);
-    },
-    { once: true }
-  );
+  context.registerPageCleanup?.(() => {
+    disposed = true;
+    renderSeq += 1;
+    window.removeEventListener('soundhub:library-updated', refreshHandler);
+  });
 
   await loadData();
 }
@@ -258,7 +263,7 @@ function formatDuration(seconds) {
   return `${minutes}:${String(sec).padStart(2, '0')}`;
 }
 
-function hydrateTrackDurations(container, tracks) {
+function hydrateTrackDurations(container, tracks, isActive = () => true) {
   const byId = new Map((Array.isArray(tracks) ? tracks : []).map((track) => [String(track.id), track]));
   container.querySelectorAll('[data-track-id]').forEach((row) => {
     const trackId = String(row.getAttribute('data-track-id') || '').trim();
@@ -267,6 +272,7 @@ function hydrateTrackDurations(container, tracks) {
     const target = row.querySelector('.sh-detail-track-duration');
     if (!target) return;
     resolveStreamDuration(track.id).then((seconds) => {
+      if (!isActive() || !row.isConnected) return;
       if (seconds > 1) {
         target.textContent = formatDuration(seconds);
       }
@@ -275,31 +281,59 @@ function hydrateTrackDurations(container, tracks) {
 }
 
 const streamDurationCache = new Map();
+const pendingDurationProbes = [];
+let activeDurationProbes = 0;
+const MAX_PARALLEL_DURATION_PROBES = 4;
 
 function resolveStreamDuration(trackId) {
   if (streamDurationCache.has(trackId)) {
     return streamDurationCache.get(trackId);
   }
-  const pending = new Promise((resolve, reject) => {
+  const pending = enqueueDurationProbe(() => new Promise((resolve, reject) => {
     const audio = new Audio();
+    let settled = false;
+    const finalize = (callback) => {
+      if (settled) return;
+      settled = true;
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.src = '';
+      audio.load();
+      callback();
+    };
     audio.preload = 'metadata';
     audio.src = API.streamUrl(trackId);
-    const cleanup = () => {
-      audio.removeAttribute('src');
-      audio.load();
-    };
     audio.addEventListener('loadedmetadata', () => {
       const seconds = Math.max(0, Math.round(Number(audio.duration || 0)));
-      cleanup();
-      resolve(seconds);
+      finalize(() => resolve(seconds));
     }, { once: true });
     audio.addEventListener('error', () => {
-      cleanup();
-      reject(new Error('failed to probe duration'));
+      finalize(() => reject(new Error('failed to probe duration')));
     }, { once: true });
-  });
+  }));
   streamDurationCache.set(trackId, pending);
   return pending;
+}
+
+function enqueueDurationProbe(task) {
+  return new Promise((resolve, reject) => {
+    pendingDurationProbes.push({ task, resolve, reject });
+    flushDurationProbeQueue();
+  });
+}
+
+function flushDurationProbeQueue() {
+  while (activeDurationProbes < MAX_PARALLEL_DURATION_PROBES && pendingDurationProbes.length) {
+    const next = pendingDurationProbes.shift();
+    activeDurationProbes += 1;
+    Promise.resolve()
+      .then(() => next.task())
+      .then(next.resolve, next.reject)
+      .finally(() => {
+        activeDurationProbes = Math.max(0, activeDurationProbes - 1);
+        flushDurationProbeQueue();
+      });
+  }
 }
 
 function escapeHtml(value) {

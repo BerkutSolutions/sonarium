@@ -124,6 +124,47 @@ func (r *TrackRepository) HasIdentity(ctx context.Context, title, artistName, ge
 	return exists, nil
 }
 
+func (r *TrackRepository) FindByTitle(ctx context.Context, title string) (domain.Track, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, title, album_id, artist_id, track_number, duration_seconds, file_path, genre, codec, bitrate, file_size_bytes, COALESCE(uploaded_by_user_id, ''), replay_gain_track, replay_gain_album, created_at, updated_at
+		FROM tracks
+		WHERE LOWER(BTRIM(title)) = LOWER(BTRIM($1))
+		ORDER BY updated_at DESC, created_at DESC
+		LIMIT 1
+	`, title)
+	if err != nil {
+		return domain.Track{}, fmt.Errorf("find track by title: %w", err)
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return domain.Track{}, sql.ErrNoRows
+	}
+	return scanTrack(rows)
+}
+
+func (r *TrackRepository) FindByIdentity(ctx context.Context, title, artistName, genre string) (domain.Track, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT t.id, t.title, t.album_id, t.artist_id, t.track_number, t.duration_seconds, t.file_path, t.genre, t.codec, t.bitrate, t.file_size_bytes, COALESCE(t.uploaded_by_user_id, ''), t.replay_gain_track, t.replay_gain_album, t.created_at, t.updated_at
+		FROM tracks t
+		INNER JOIN artists a ON a.id = t.artist_id
+		WHERE LOWER(BTRIM(t.title)) = LOWER(BTRIM($1))
+		  AND LOWER(BTRIM(a.name)) = LOWER(BTRIM($2))
+		  AND LOWER(BTRIM(COALESCE(t.genre, ''))) = LOWER(BTRIM($3))
+		ORDER BY t.updated_at DESC, t.created_at DESC
+		LIMIT 1
+	`, title, artistName, genre)
+	if err != nil {
+		return domain.Track{}, fmt.Errorf("find track by identity: %w", err)
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return domain.Track{}, sql.ErrNoRows
+	}
+	return scanTrack(rows)
+}
+
 func (r *TrackRepository) ListByAlbumID(ctx context.Context, albumID string) ([]domain.Track, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT id, title, album_id, artist_id, track_number, duration_seconds, file_path, genre, codec, bitrate, file_size_bytes, COALESCE(uploaded_by_user_id, ''), replay_gain_track, replay_gain_album, created_at, updated_at

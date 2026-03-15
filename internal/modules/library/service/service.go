@@ -48,6 +48,23 @@ type ScanService struct {
 }
 
 var ErrDuplicateUpload = errors.New("duplicate track")
+var ErrInvalidTrackIntegrity = errors.New("invalid track integrity")
+
+type DuplicatePolicy string
+
+const (
+	DuplicatePolicyKeep    DuplicatePolicy = "keep"
+	DuplicatePolicySkip    DuplicatePolicy = "skip"
+	DuplicatePolicyReplace DuplicatePolicy = "replace"
+)
+
+type IntegrityIssue struct {
+	TrackID  string `json:"track_id"`
+	Title    string `json:"title"`
+	FilePath string `json:"file_path"`
+	Reason   string `json:"reason"`
+	Severity string `json:"severity"`
+}
 
 type scanJob struct {
 	entry scanner.FileEntry
@@ -453,7 +470,7 @@ func fingerprintHash(file scanner.FileEntry) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func (s *ScanService) ScanUploadedFile(ctx context.Context, path, uploadedByUserID string, skipDuplicates bool) error {
+func (s *ScanService) ScanUploadedFile(ctx context.Context, path, uploadedByUserID string, duplicatePolicy DuplicatePolicy) error {
 	info, err := os.Stat(path)
 	if err != nil {
 		return fmt.Errorf("stat uploaded file: %w", err)
@@ -464,29 +481,17 @@ func (s *ScanService) ScanUploadedFile(ctx context.Context, path, uploadedByUser
 		ModTime: info.ModTime().UTC(),
 	}
 
+	if err := s.metadataReader.Validate(entry.Path); err != nil {
+		return fmt.Errorf("%w: %v", ErrInvalidTrackIntegrity, err)
+	}
+
 	meta, err := s.metadataReader.Read(entry.Path)
 	if err != nil {
 		s.logger.Warn("metadata read failed for uploaded file", zap.String("file", entry.Path), zap.Error(err))
 		meta = fallbackMetadata(entry.Path)
 	}
-	if skipDuplicates {
-		title := fallback(meta.Title, strings.TrimSuffix(filepath.Base(entry.Path), filepath.Ext(entry.Path)))
-		artist := fallback(meta.Artist, "Unknown Artist")
-		genre := strings.TrimSpace(meta.Genre)
-		byTitle, err := s.trackRepository.HasTitle(ctx, title)
-		if err != nil {
-			return fmt.Errorf("check duplicate by title: %w", err)
-		}
-		if byTitle {
-			return ErrDuplicateUpload
-		}
-		byIdentity, err := s.trackRepository.HasIdentity(ctx, title, artist, genre)
-		if err != nil {
-			return fmt.Errorf("check duplicate by metadata: %w", err)
-		}
-		if byIdentity {
-			return ErrDuplicateUpload
-		}
+	if err := s.handleDuplicateUpload(ctx, entry.Path, meta, duplicatePolicy); err != nil {
+		return err
 	}
 	if err := s.persistTrack(ctx, entry, meta, uploadedByUserID); err != nil {
 		return fmt.Errorf("persist uploaded track: %w", err)
@@ -501,6 +506,129 @@ func (s *ScanService) ScanUploadedFile(ctx context.Context, path, uploadedByUser
 		s.scheduleAggregateRefresh()
 	}
 	return nil
+}
+
+func (s *ScanService) CheckIntegrity(ctx context.Context) ([]IntegrityIssue, error) {
+	tracks, err := s.trackRepository.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list tracks for integrity check: %w", err)
+	}
+	issues := make([]IntegrityIssue, 0)
+	for _, track := range tracks {
+		filePath := strings.TrimSpace(track.FilePath)
+		if filePath == "" {
+			issues = append(issues, IntegrityIssue{
+				TrackID:  track.ID,
+				Title:    track.Title,
+				FilePath: "",
+				Reason:   "missing file path",
+				Severity: "error",
+			})
+			continue
+		}
+		if _, err := os.Stat(filePath); err != nil {
+			issues = append(issues, IntegrityIssue{
+				TrackID:  track.ID,
+				Title:    track.Title,
+				FilePath: filePath,
+				Reason:   "file is missing on disk",
+				Severity: "error",
+			})
+			continue
+		}
+		if err := s.metadataReader.Validate(filePath); err != nil {
+			issues = append(issues, IntegrityIssue{
+				TrackID:  track.ID,
+				Title:    track.Title,
+				FilePath: filePath,
+				Reason:   err.Error(),
+				Severity: "error",
+			})
+		}
+	}
+	return issues, nil
+}
+
+func (s *ScanService) handleDuplicateUpload(ctx context.Context, uploadedPath string, meta metadata.AudioMetadata, duplicatePolicy DuplicatePolicy) error {
+	policy := normalizeDuplicatePolicy(duplicatePolicy)
+	if policy == DuplicatePolicyKeep {
+		return nil
+	}
+	title := fallback(meta.Title, strings.TrimSuffix(filepath.Base(uploadedPath), filepath.Ext(uploadedPath)))
+	artist := fallback(meta.Artist, "Unknown Artist")
+	genre := strings.TrimSpace(meta.Genre)
+
+	duplicate, err := s.findDuplicateTrack(ctx, title, artist, genre)
+	if err != nil {
+		return err
+	}
+	if duplicate.ID == "" {
+		return nil
+	}
+	if policy == DuplicatePolicySkip {
+		return ErrDuplicateUpload
+	}
+	if err := s.removeDuplicateTrack(ctx, duplicate); err != nil {
+		return fmt.Errorf("replace duplicate track: %w", err)
+	}
+	return nil
+}
+
+func (s *ScanService) findDuplicateTrack(ctx context.Context, title, artist, genre string) (domain.Track, error) {
+	type duplicateFinder interface {
+		FindByIdentity(context.Context, string, string, string) (domain.Track, error)
+		FindByTitle(context.Context, string) (domain.Track, error)
+	}
+	finder, ok := s.trackRepository.(duplicateFinder)
+	if !ok {
+		return domain.Track{}, nil
+	}
+	track, err := finder.FindByIdentity(ctx, title, artist, genre)
+	if err == nil {
+		return track, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return domain.Track{}, fmt.Errorf("check duplicate by metadata: %w", err)
+	}
+	track, err = finder.FindByTitle(ctx, title)
+	if err == nil {
+		return track, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return domain.Track{}, fmt.Errorf("check duplicate by title: %w", err)
+	}
+	return domain.Track{}, nil
+}
+
+func (s *ScanService) removeDuplicateTrack(ctx context.Context, track domain.Track) error {
+	if strings.TrimSpace(track.ID) == "" {
+		return nil
+	}
+	if s.statsRepository != nil {
+		if err := s.statsRepository.DeleteTrack(ctx, track.ID); err != nil {
+			return fmt.Errorf("delete duplicate track record: %w", err)
+		}
+	}
+	if track.FilePath != "" {
+		if s.fingerprintRepo != nil {
+			if err := s.fingerprintRepo.Delete(ctx, track.FilePath); err != nil {
+				s.logger.Warn("failed to delete duplicate fingerprint", zap.String("file", track.FilePath), zap.Error(err))
+			}
+		}
+		if err := os.Remove(track.FilePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("delete duplicate file: %w", err)
+		}
+	}
+	return nil
+}
+
+func normalizeDuplicatePolicy(policy DuplicatePolicy) DuplicatePolicy {
+	switch policy {
+	case DuplicatePolicySkip, DuplicatePolicyReplace:
+		return policy
+	default:
+		return DuplicatePolicyKeep
+	}
 }
 
 func (s *ScanService) scheduleAggregateRefresh() {

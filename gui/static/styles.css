@@ -11110,6 +11110,22 @@ body.sh-modal-open {
   border-color: rgba(139, 169, 255, 0.75);
 }
 
+.sh-player-favorite {
+  color: rgba(233, 239, 255, 0.78);
+}
+
+.sh-player-favorite.is-active {
+  color: #ff7aa8 !important;
+  background: rgba(190, 69, 106, 0.18) !important;
+  border-color: rgba(255, 159, 191, 0.34) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 159, 191, 0.08);
+}
+
+.sh-player-favorite:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .sh-icon-btn-primary {
   background: linear-gradient(135deg, #5d86ff, #7d9bff);
   color: #05060a;
@@ -13401,6 +13417,24 @@ body.sh-modal-open {
   color: #f8fbff;
 }
 
+.sh-detail-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.sh-detail-action-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.sh-detail-action-heart.active {
+  background: rgba(190, 69, 106, 0.18) !important;
+  color: #ffd7e4 !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 159, 191, 0.24);
+}
+
 .sh-detail-section h2 {
   margin: 0 0 18px;
   font-size: 30px;
@@ -15238,10 +15272,47 @@ body.sidebar-collapsed .sidebar-lang-select {
 
 .sh-player-meta.is-clickable {
   cursor: pointer;
+  border-radius: 12px;
+  padding: 8px 12px 8px 8px;
+  margin: -8px -12px -8px -8px;
+  transition: background-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  position: relative;
 }
 
-.sh-player-meta.is-clickable:hover .sh-player-title {
+.sh-player-meta.is-clickable::after {
+  content: '\2197';
+  align-self: flex-start;
+  font-size: 12px;
+  line-height: 1;
+  color: rgba(186, 203, 255, 0.78);
+  opacity: 0.72;
+  transform: translateY(2px);
+  transition: opacity 0.18s ease, transform 0.18s ease, color 0.18s ease;
+}
+
+.sh-player-meta.is-clickable:hover,
+.sh-player-meta.is-clickable:focus-visible {
+  background: linear-gradient(135deg, rgba(113, 150, 255, 0.16), rgba(113, 150, 255, 0.07));
+  box-shadow: inset 0 0 0 1px rgba(140, 174, 255, 0.22);
+  transform: translateY(-1px);
+}
+
+.sh-player-meta.is-clickable:hover .sh-player-title,
+.sh-player-meta.is-clickable:focus-visible .sh-player-title {
   text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+.sh-player-meta.is-clickable:hover::after,
+.sh-player-meta.is-clickable:focus-visible::after {
+  opacity: 1;
+  color: rgba(218, 228, 255, 0.98);
+  transform: translate(1px, 0);
+}
+
+.sh-player-meta.is-clickable:focus-visible {
+  outline: none;
 }
 
 /* player width balance tweak */
