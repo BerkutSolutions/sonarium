@@ -1,6 +1,6 @@
 import { API } from './api.js';
 import { QueueModel } from './queue.js';
-import { loadPlaybackState, savePlaybackState, sanitizeState } from './playback-state.js';
+import { clearPlaybackState, loadPlaybackState, savePlaybackState, sanitizeState } from './playback-state.js';
 import { applyTranslations, t } from './i18n.js';
 import { loadArtistNameMap } from './artist-map.js';
 
@@ -37,6 +37,10 @@ export class Player {
     this.repeatMode = 'off';
     this._syncTimer = null;
     this._artistMapPromise = null;
+    this._albumTitleCache = new Map();
+    this._mediaSessionArtworkURL = '';
+    this._mediaSessionArtworkTrackID = '';
+    this._mediaSessionArtworkAbort = null;
     this._progressFrame = 0;
     this._restoredCurrentTime = 0;
     this._progressAnchorTime = 0;
@@ -60,6 +64,7 @@ export class Player {
 
     this.audio.volume = 0.5;
 
+    this._initMediaSession();
     this._bindEvents();
     this._applyInitialState();
     this._render();
@@ -78,10 +83,17 @@ export class Player {
       this._applyState(sanitizedLocal, false, { hydrateMedia: this._isAuthenticated() });
     }
     if (!this._isAuthenticated()) {
-      if (!local) {
-        this.volume.value = '0.5';
-        this._setVolumeVisual(0.5);
-      }
+      clearPlaybackState();
+      this.queue.clear();
+      this.isPlaying = false;
+      this.audio.pause();
+      this._detachAudioSource();
+      this._clearMediaSession();
+      this._restoredCurrentTime = 0;
+      this._syncProgressAnchor(0);
+      this.volume.value = '0.5';
+      this._setVolumeVisual(0.5);
+      this._render();
       return;
     }
     try {
@@ -134,14 +146,10 @@ export class Player {
     });
 
     this.progress.addEventListener('input', () => {
-      if (!this.audio.duration) return;
-      const nextTime = (Number(this.progress.value) / 10000) * this.audio.duration;
-      this.audio.currentTime = nextTime;
-      this._restoredCurrentTime = nextTime;
-      this._syncProgressAnchor(nextTime);
-      this.currentTime.textContent = formatTime(Math.floor(nextTime));
-      this._setProgressVisual(this.audio.duration ? (nextTime / this.audio.duration) : 0);
-      this._scheduleSync();
+      const duration = this._currentDurationSeconds();
+      if (!duration) return;
+      const nextTime = (Number(this.progress.value) / 10000) * duration;
+      this._seekTo(nextTime);
     });
 
     this.audio.addEventListener('play', () => {
@@ -149,6 +157,7 @@ export class Player {
       this._restoredCurrentTime = Math.max(0, Number(this.audio.currentTime || this._restoredCurrentTime || 0));
       this._syncProgressAnchor(this._restoredCurrentTime);
       this._emitPlaybackState();
+      this._updateMediaSession();
       this._startProgressLoop();
       this._renderControls();
       this._scheduleSync();
@@ -158,6 +167,7 @@ export class Player {
       this._restoredCurrentTime = Math.max(0, Number(this.audio.currentTime || this._restoredCurrentTime || 0));
       this._syncProgressAnchor(this._restoredCurrentTime);
       this._emitPlaybackState();
+      this._updateMediaSession();
       this._stopProgressLoop();
       this._renderProgress();
       this._renderControls();
@@ -167,6 +177,7 @@ export class Player {
       this._restoredCurrentTime = Math.max(0, Number(this.audio.currentTime || this._restoredCurrentTime || 0));
       this._syncProgressAnchor(this._restoredCurrentTime);
       this._renderProgress();
+      this._updateMediaSessionPosition();
     });
     this.audio.addEventListener('loadedmetadata', () => {
       if (this._restoredCurrentTime > 0) {
@@ -179,6 +190,10 @@ export class Player {
       this._syncProgressAnchor(Math.max(0, Number(this.audio.currentTime || this._restoredCurrentTime || 0)));
       this.duration.textContent = formatTime(Math.floor(this.audio.duration || 0));
       this._renderProgress();
+      this._updateMediaSession();
+    });
+    this.audio.addEventListener('durationchange', () => {
+      this._updateMediaSessionPosition();
     });
     this.audio.addEventListener('seeking', () => {
       this._syncProgressAnchor(Math.max(0, Number(this.audio.currentTime || this._restoredCurrentTime || 0)));
@@ -187,9 +202,11 @@ export class Player {
       this._restoredCurrentTime = Math.max(0, Number(this.audio.currentTime || this._restoredCurrentTime || 0));
       this._syncProgressAnchor(this._restoredCurrentTime);
       this._renderProgress();
+      this._updateMediaSessionPosition();
     });
     this.audio.addEventListener('ended', () => {
       this._emitPlaybackState();
+      this._updateMediaSession();
       this._stopProgressLoop();
       this.next(true);
     });
@@ -346,6 +363,7 @@ export class Player {
   }
 
   playAt(index) {
+    if (!this._isAuthenticated()) return;
     if (!this.queue.setPosition(index)) return;
     const current = this.queue.current();
     if (!current) return;
@@ -466,6 +484,7 @@ export class Player {
     this._renderControls();
     applyTranslations(this.root);
     this._renderFavoriteButton();
+    this._updateMediaSession();
   }
 
   _renderControls() {
@@ -722,11 +741,17 @@ export class Player {
 
   onAuthChanged(status) {
     if (!status?.authenticated) {
+      clearPlaybackState();
+      this.queue.clear();
+      this.isPlaying = false;
       this.audio.pause();
       this._detachAudioSource();
+      this._restoredCurrentTime = 0;
+      this._syncProgressAnchor(0);
       this.cover.src = '/static/logo.png';
       this._favoriteTrackIDs = new Set();
       this._render();
+      this._clearMediaSession();
       return;
     }
     this._loadFavoriteTrackIDs().then((ids) => {
@@ -886,12 +911,16 @@ export class Player {
     if (this.queue.current()?.track_id === current.track_id) {
       this.artist.textContent = name;
       this._renderQueue();
+      this._updateMediaSession();
     }
   }
 
   async _hydrateCurrentMetadata(current) {
     if (!current?.track_id) return;
-    if (current.title && current.artist) return;
+    if (current.title && current.artist && current.album_title) {
+      this._updateMediaSession();
+      return;
+    }
     try {
       const track = await API.getTrack(current.track_id);
       if (!track) return;
@@ -907,9 +936,32 @@ export class Player {
       if (!current.artist && current.artist_id) {
         await this._resolveArtistName(current);
       }
+      if (!current.album_title && current.cover_ref) {
+        await this._resolveAlbumTitle(current);
+      }
       this._renderQueue();
+      this._updateMediaSession();
     } catch (_) {
       this._handleMissingCurrentTrack(current.track_id);
+    }
+  }
+
+  async _resolveAlbumTitle(current) {
+    const albumID = String(current?.cover_ref || '').trim();
+    if (!albumID) return;
+    if (this._albumTitleCache.has(albumID)) {
+      current.album_title = this._albumTitleCache.get(albumID) || '';
+      return;
+    }
+    try {
+      const album = await API.getAlbum(albumID);
+      const title = String(album?.title || album?.Title || '').trim();
+      this._albumTitleCache.set(albumID, title);
+      if (title) {
+        current.album_title = title;
+      }
+    } catch (_) {
+      this._albumTitleCache.set(albumID, '');
     }
   }
 
@@ -951,6 +1003,7 @@ export class Player {
     if (this._progressFrame) return;
     const tick = () => {
       this._renderProgress();
+      this._updateMediaSessionPosition();
       if (!this.audio.paused && !this.audio.ended) {
         this._progressFrame = window.requestAnimationFrame(tick);
         return;
@@ -972,8 +1025,187 @@ export class Player {
     try {
       this.audio.removeAttribute('src');
       this.audio.src = '';
+      this.audio.load();
     } catch (_) {
       // best-effort detach
+    }
+  }
+
+  _seekTo(seconds) {
+    const duration = this._currentDurationSeconds();
+    const nextTime = clamp(Number(seconds || 0), 0, Math.max(0, Number(duration || 0)));
+    try {
+      if (typeof this.audio.fastSeek === 'function') {
+        this.audio.fastSeek(nextTime);
+      } else {
+        this.audio.currentTime = nextTime;
+      }
+    } catch (_) {
+      this.audio.currentTime = nextTime;
+    }
+    this._restoredCurrentTime = nextTime;
+    this._syncProgressAnchor(nextTime);
+    this._renderProgress();
+    this._updateMediaSessionPosition();
+    this._scheduleSync();
+  }
+
+  stop() {
+    this.audio.pause();
+    this._seekTo(0);
+    this._renderControls();
+    this._updateMediaSession();
+  }
+
+  _initMediaSession() {
+    if (!('mediaSession' in navigator)) return;
+    const handlers = {
+      play: () => this.audio.play().catch(() => {}),
+      pause: () => this.audio.pause(),
+      stop: () => this.stop(),
+      previoustrack: () => this.previous(),
+      nexttrack: () => this.next()
+    };
+    Object.entries(handlers).forEach(([action, handler]) => {
+      try {
+        navigator.mediaSession.setActionHandler(action, handler);
+      } catch (_) {
+        // action is not supported in this browser
+      }
+    });
+    this._updateMediaSession();
+  }
+
+  _updateMediaSession() {
+    if (!('mediaSession' in navigator)) return;
+    const current = this.queue.current();
+    if (!current) {
+      this._clearMediaSession();
+      return;
+    }
+    const metadata = this._mediaSessionMetadataFor(current);
+    if (metadata && 'MediaMetadata' in window) {
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata(metadata);
+      } catch (_) {
+        navigator.mediaSession.metadata = null;
+      }
+    }
+    navigator.mediaSession.playbackState = this.isPlaying && !this.audio.paused && !this.audio.ended ? 'playing' : 'paused';
+    this._updateMediaSessionPosition();
+    this._syncMediaSessionArtwork(current);
+  }
+
+  _clearMediaSession() {
+    if (!('mediaSession' in navigator)) return;
+    if (this._mediaSessionArtworkAbort) {
+      this._mediaSessionArtworkAbort.abort();
+      this._mediaSessionArtworkAbort = null;
+    }
+    this._revokeMediaSessionArtworkURL();
+    try {
+      navigator.mediaSession.metadata = null;
+    } catch (_) {
+      // ignore unsupported assignment
+    }
+    try {
+      navigator.mediaSession.playbackState = 'none';
+    } catch (_) {
+      // ignore unsupported assignment
+    }
+  }
+
+  _revokeMediaSessionArtworkURL() {
+    if (this._mediaSessionArtworkURL) {
+      try {
+        URL.revokeObjectURL(this._mediaSessionArtworkURL);
+      } catch (_) {
+        // ignore object url cleanup issues
+      }
+    }
+    this._mediaSessionArtworkURL = '';
+    this._mediaSessionArtworkTrackID = '';
+  }
+
+  _updateMediaSessionPosition() {
+    if (!('mediaSession' in navigator) || typeof navigator.mediaSession.setPositionState !== 'function') return;
+    const duration = this._currentDurationSeconds();
+    if (!Number.isFinite(duration) || duration <= 0) return;
+    try {
+      navigator.mediaSession.setPositionState({
+        duration,
+        playbackRate: Math.max(0.1, Number(this.audio.playbackRate || 1)),
+        position: clamp(this._currentPlaybackSeconds(), 0, duration)
+      });
+    } catch (_) {
+      // some platforms reject transient states; ignore
+    }
+  }
+
+  _mediaSessionMetadataFor(current) {
+    if (!current) return null;
+    const artwork = this._mediaSessionArtworkTrackID === current.track_id && this._mediaSessionArtworkURL
+      ? [{ src: this._mediaSessionArtworkURL }]
+      : current.cover_ref
+      ? [
+          {
+            src: new URL(API.albumCoverUrl(current.cover_ref), window.location.origin).toString()
+          },
+          ...[64, 128, 256].map((size) => ({
+            src: new URL(API.albumCoverThumbUrl(current.cover_ref, size), window.location.origin).toString(),
+            sizes: `${size}x${size}`
+          }))
+        ]
+      : [{
+          src: new URL('/static/logo.png', window.location.origin).toString(),
+          sizes: '512x512'
+        }];
+    return {
+      title: String(current.title || t('unknown_title', 'Unknown title')).trim(),
+      artist: String(current.artist || t('unknown_artist', 'Unknown artist')).trim(),
+      album: String(current.album_title || current.albumTitle || current.AlbumTitle || 'Sonarium').trim(),
+      artwork
+    };
+  }
+
+  async _syncMediaSessionArtwork(current) {
+    if (!('mediaSession' in navigator) || !('MediaMetadata' in window)) return;
+    const trackID = String(current?.track_id || '').trim();
+    const coverRef = String(current?.cover_ref || '').trim();
+    if (!trackID || !coverRef) {
+      if (this._mediaSessionArtworkTrackID && this._mediaSessionArtworkTrackID !== trackID) {
+        this._revokeMediaSessionArtworkURL();
+      }
+      return;
+    }
+    if (this._mediaSessionArtworkTrackID === trackID && this._mediaSessionArtworkURL) {
+      return;
+    }
+    if (this._mediaSessionArtworkAbort) {
+      this._mediaSessionArtworkAbort.abort();
+    }
+    const controller = new AbortController();
+    this._mediaSessionArtworkAbort = controller;
+    try {
+      const response = await fetch(API.albumCoverUrl(coverRef), {
+        credentials: 'include',
+        signal: controller.signal
+      });
+      if (!response.ok) return;
+      const blob = await response.blob();
+      if (!blob || !String(blob.type || '').toLowerCase().startsWith('image/')) return;
+      const nextURL = URL.createObjectURL(blob);
+      this._revokeMediaSessionArtworkURL();
+      this._mediaSessionArtworkURL = nextURL;
+      this._mediaSessionArtworkTrackID = trackID;
+      if (this.queue.current()?.track_id !== trackID) return;
+      navigator.mediaSession.metadata = new MediaMetadata(this._mediaSessionMetadataFor(current));
+    } catch (_) {
+      // keep fallback artwork urls
+    } finally {
+      if (this._mediaSessionArtworkAbort === controller) {
+        this._mediaSessionArtworkAbort = null;
+      }
     }
   }
 
@@ -1060,6 +1292,7 @@ function compactTracks(tracks) {
       title: String(track.title || track.Title || '').trim(),
       artist: String(track.artist || track.Artist || track.artist_name || track.artistName || '').trim(),
       artist_id: String(track.artist_id || track.artistId || track.ArtistID || '').trim(),
+      album_title: String(track.album_title || track.albumTitle || track.AlbumTitle || '').trim(),
       duration: toInt(track.duration || track.Duration || 0),
       cover_ref: String(track.cover_ref || track.coverRef || track.album_id || track.albumId || track.AlbumID || '').trim()
     });

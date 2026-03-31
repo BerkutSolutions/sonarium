@@ -32,7 +32,7 @@ async function init() {
   const authStatus = await auth.init();
   const sidebarVersion = document.getElementById('sidebar-version');
   const sidebarToggle = document.getElementById('sidebar-toggle');
-  const sidebarBrand = document.querySelector('.sh-sidebar .sh-brand');
+  const sidebarBrand = document.getElementById('sidebar-brand');
   const mobileNavToggle = document.getElementById('mobile-nav-toggle');
   const mobileSidebarBackdrop = document.getElementById('mobile-sidebar-backdrop');
   initSidebarCollapse(sidebarToggle, sidebarBrand, mobileNavToggle, mobileSidebarBackdrop);
@@ -42,6 +42,9 @@ async function init() {
 
   const player = new Player(playerRoot, { auth });
   const shareModal = createShareModal();
+  if (typeof player.onAuthChanged === 'function') {
+    player.onAuthChanged(authStatus);
+  }
 
   const context = { player, auth, shareModal };
   const controllers = {
@@ -135,6 +138,7 @@ function initSidebarCollapse(toggleButton, brand, mobileToggleButton, mobileBack
   };
   const apply = (collapsed) => {
     document.body.classList.toggle('sidebar-collapsed', collapsed);
+    toggleButton.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
     toggleButton.setAttribute('aria-label', collapsed ? t('sidebar_expand', 'Expand sidebar') : t('sidebar_collapse', 'Collapse sidebar'));
   };
   const toggle = () => {
@@ -154,6 +158,14 @@ function initSidebarCollapse(toggleButton, brand, mobileToggleButton, mobileBack
   mobileBackdrop?.addEventListener('click', closeMobileNav);
   brand?.addEventListener('click', (event) => {
     if (event.target.closest('#sidebar-toggle')) return;
+    if (mobileMedia.matches) return;
+    toggle();
+  });
+  brand?.addEventListener('keydown', (event) => {
+    if (mobileMedia.matches) return;
+    if (event.target.closest('#sidebar-toggle')) return;
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
     toggle();
   });
   document.getElementById('sidebar-nav')?.addEventListener('click', (event) => {

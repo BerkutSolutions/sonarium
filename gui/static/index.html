@@ -14,13 +14,12 @@
 <body class="auth-pending">
   <div class="sh-app">
     <aside class="sh-sidebar">
-      <div class="sh-brand">
+      <div class="sh-brand" id="sidebar-brand" role="button" tabindex="0">
+        <img src="/static/logo.png" alt="Sonarium" class="sh-logo-collapsed" />
         <img src="/static/logo.png" alt="Sonarium" class="sh-logo" />
         <span class="sh-brand-text"><span class="sh-brand-top">Berkut Solutions</span><span class="sh-brand-bottom">Sonarium</span></span>
-        <button type="button" class="icon-btn sidebar-toggle" id="sidebar-toggle" aria-label="Collapse sidebar" data-i18n-aria-label="sidebar_collapse">
-          <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16">
-            <path fill="currentColor" d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
-          </svg>
+        <button type="button" class="sidebar-collapse-btn" id="sidebar-toggle" aria-label="Collapse sidebar" aria-expanded="true" data-i18n-aria-label="sidebar_collapse">
+          <span aria-hidden="true">&gt;</span>
         </button>
       </div>
       <nav class="sh-nav" id="sidebar-nav">
@@ -82,7 +81,7 @@
             </svg>
           </button>
         </div>
-        <div id="sidebar-version" class="app-version" hidden>v1.0.5</div>
+        <div id="sidebar-version" class="app-version" hidden>v1.0.6</div>
       </div>
     </aside>
 

@@ -276,6 +276,9 @@ export const API = {
   },
   albumCoverThumbUrl(albumId, size = 256) {
     return `/api/covers/album/${encodeURIComponent(albumId)}/thumb/${encodeURIComponent(size)}`;
+  },
+  albumCoverUrl(albumId) {
+    return `/api/covers/album/${encodeURIComponent(albumId)}`;
   }
 };
 

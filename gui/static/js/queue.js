@@ -161,6 +161,7 @@ function compactItems(items) {
       title: String(raw.title || raw.Title || '').trim(),
       artist: String(raw.artist || raw.Artist || raw.artist_name || raw.artistName || '').trim(),
       artist_id: String(raw.artist_id || raw.artistId || raw.ArtistID || '').trim(),
+      album_title: String(raw.album_title || raw.albumTitle || raw.AlbumTitle || '').trim(),
       duration: toInt(raw.duration || raw.Duration || 0),
       cover_ref: String(raw.cover_ref || raw.album_id || raw.albumId || raw.AlbumID || '').trim()
     });

@@ -62,6 +62,7 @@ function compactQueue(items) {
       title: String(item.title || item.Title || '').trim(),
       artist: String(item.artist || item.Artist || '').trim(),
       artist_id: String(item.artist_id || item.artistId || item.ArtistID || '').trim(),
+      album_title: String(item.album_title || item.albumTitle || item.AlbumTitle || '').trim(),
       duration: Math.max(0, Number.parseInt(String(item.duration || item.Duration || 0), 10) || 0),
       cover_ref: String(item.cover_ref || item.coverRef || item.album_id || item.albumId || '').trim()
     });
